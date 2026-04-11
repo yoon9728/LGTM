@@ -1,0 +1,11 @@
+{
+  "name": "ai-interview",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "node apps/web/dev-server.mjs & node apps/api/src/server.mjs",
+    "dev:web": "node apps/web/dev-server.mjs",
+    "dev:api": "node apps/api/src/server.mjs"
+  }
+}

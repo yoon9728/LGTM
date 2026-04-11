@@ -1,0 +1,265 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="Practice code review like a senior engineer. One real diff, write your analysis, get AI feedback that doesn't flatter." />
+    <meta name="theme-color" content="#040404" />
+    <title>Verdiq — Code Review Practice</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Inter:opsz,wght@14..32,300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+
+      <!-- ── Masthead ──────────────────────────────────── -->
+      <header class="masthead" aria-label="Site header">
+        <nav class="nav" aria-label="Primary navigation">
+          <span class="logo" aria-label="Verdiq">Verdiq</span>
+          <span class="nav-rule" aria-hidden="true"></span>
+          <span class="nav-descriptor">Code Review Practice</span>
+        </nav>
+      </header>
+
+
+      <!-- ── Hero ─────────────────────────────────────── -->
+      <section id="hero" class="hero" aria-labelledby="hero-heading">
+        <div class="hero-layout">
+
+          <div class="hero-content">
+            <p class="hero-eyebrow" aria-hidden="true">
+              <span class="hero-eyebrow-line"></span>
+              Code Review Practice
+            </p>
+            <h1 id="hero-heading" class="hero-title">
+              Think like<br /><em>a senior reviewer.</em>
+            </h1>
+            <p class="hero-sub">
+              One real diff per session. Write your analysis,
+              submit it, and get AI feedback that doesn't flatter.
+            </p>
+            <div class="hero-cta">
+              <button id="start-session" class="btn-primary">
+                Start a session
+                <svg width="12" height="12" viewBox="0 0 13 13" fill="none" aria-hidden="true">
+                  <path d="M2 6.5h9M8 3l3.5 3.5L8 10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+              </button>
+              <div class="hero-meta" aria-label="Session info">
+                <span class="hero-meta-item">~10 min</span>
+                <span class="hero-meta-dot" aria-hidden="true"></span>
+                <span class="hero-meta-item">AI-graded</span>
+                <span class="hero-meta-dot" aria-hidden="true"></span>
+                <span class="hero-meta-item">No signup</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Decorative aside — session format overview -->
+          <aside class="hero-aside" aria-hidden="true">
+            <p class="hero-aside-kicker">How it works</p>
+            <ol class="hero-aside-steps">
+              <li class="hero-aside-step">
+                <span class="hero-aside-n">01</span>
+                <span class="hero-aside-step-label">Read a real diff</span>
+              </li>
+              <li class="hero-aside-step">
+                <span class="hero-aside-n">02</span>
+                <span class="hero-aside-step-label">Write your analysis</span>
+              </li>
+              <li class="hero-aside-step">
+                <span class="hero-aside-n">03</span>
+                <span class="hero-aside-step-label">Get AI feedback</span>
+              </li>
+            </ol>
+          </aside>
+
+        </div>
+      </section>
+
+      <!-- ── Practice Flow ──────────────────────────────── -->
+      <section id="practice-flow" class="practice-flow" hidden aria-label="Practice session">
+
+        <!-- Session progress tracker -->
+        <div class="session-progress" aria-label="Session progress" role="status">
+          <div class="session-progress-inner">
+            <div class="session-step-track">
+              <span class="session-step" data-step="1" aria-label="Step 1: Diff">
+                <span class="session-step-dot"></span>
+                <span class="session-step-name">Diff</span>
+              </span>
+              <span class="session-step-line" aria-hidden="true"></span>
+              <span class="session-step" data-step="2" aria-label="Step 2: Analysis">
+                <span class="session-step-dot"></span>
+                <span class="session-step-name">Analysis</span>
+              </span>
+              <span class="session-step-line" aria-hidden="true"></span>
+              <span class="session-step" data-step="3" aria-label="Step 3: Result">
+                <span class="session-step-dot"></span>
+                <span class="session-step-name">Result</span>
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Status toast -->
+        <div id="status-line" class="status-line" hidden aria-live="polite" role="status">
+          <span class="status-indicator" aria-hidden="true"></span>
+          <span id="status-text" class="status-text"></span>
+        </div>
+
+        <!-- Step 01 · Diff -->
+        <div class="step step--diff">
+          <div class="step-header">
+            <div class="step-index" aria-hidden="true">01</div>
+            <div class="step-labels">
+              <span class="step-title">Code Review Prompt</span>
+              <h2 id="question-title" class="question-title">Loading…</h2>
+            </div>
+          </div>
+          <div class="diff-wrap">
+            <div class="diff-toolbar">
+              <div class="diff-toolbar-left">
+                <span class="diff-toolbar-icon" aria-hidden="true">
+                  <svg width="11" height="11" viewBox="0 0 11 11" fill="none"><rect x="0.5" y="0.5" width="10" height="10" rx="2" stroke="currentColor" stroke-width="1"/><path d="M3 5.5h5M3 3.5h3M3 7.5h4" stroke="currentColor" stroke-width="1" stroke-linecap="round"/></svg>
+                </span>
+                <span class="diff-toolbar-label">diff</span>
+                <span id="diff-filename" class="diff-filename"></span>
+              </div>
+              <div class="diff-toolbar-right">
+                <span id="diff-stats" class="diff-stats" aria-label="Change statistics"></span>
+                <span class="diff-legend" aria-label="Diff legend">
+                  <span class="diff-legend-item diff-legend-item--add" aria-label="Added lines">+&thinsp;added</span>
+                  <span class="diff-legend-item diff-legend-item--rem" aria-label="Removed lines">−&thinsp;removed</span>
+                </span>
+              </div>
+            </div>
+            <pre id="diff-view" class="diff-view" aria-label="Code diff" tabindex="0"></pre>
+          </div>
+        </div>
+
+        <!-- Step 02 · Analysis -->
+        <div class="step step--form">
+          <div class="step-header">
+            <div class="step-index" aria-hidden="true">02</div>
+            <div class="step-labels">
+              <span class="step-title">Your Analysis</span>
+              <p class="step-desc">Write precisely. Vague answers score poorly.</p>
+            </div>
+          </div>
+
+          <form id="answer-form" class="answer-form" novalidate>
+            <div class="field">
+              <label class="field-label" for="summary">
+                Summary
+                <span class="field-hint">The single most important issue</span>
+              </label>
+              <textarea
+                id="summary"
+                name="summary"
+                rows="3"
+                placeholder="The biggest problem in this diff is…"
+                spellcheck="false"
+                autocomplete="off"
+              ></textarea>
+            </div>
+            <div class="field">
+              <label class="field-label" for="findings">
+                Findings
+                <span class="field-hint">What you found and why it matters</span>
+              </label>
+              <textarea
+                id="findings"
+                name="findings"
+                rows="8"
+                placeholder="1. …&#10;2. …&#10;3. …"
+                spellcheck="false"
+                autocomplete="off"
+              ></textarea>
+            </div>
+            <div class="form-actions">
+              <button id="submit-answer" type="submit" class="btn-primary">
+                Submit answer
+              </button>
+              <button id="retry-answer" type="button" class="btn-ghost" hidden>
+                Retry
+              </button>
+            </div>
+          </form>
+        </div>
+
+        <!-- Step 03 · Evaluation -->
+        <div id="result-panel" class="step step--result" hidden aria-label="Evaluation result">
+          <div class="step-header">
+            <div class="step-index" aria-hidden="true">03</div>
+            <div class="step-labels">
+              <span class="step-title">Evaluation</span>
+              <p class="step-desc">AI-graded against expert criteria.</p>
+            </div>
+          </div>
+
+          <div class="score-block">
+            <div class="score-display-wrap">
+              <span id="score-value" class="score-value" aria-label="Score">—</span>
+              <div class="score-meta">
+                <span class="score-denom">/ 10</span>
+                <span id="score-grade" class="score-grade" aria-label="Grade"></span>
+              </div>
+            </div>
+            <div id="score-bar-wrap" class="score-bar-wrap" aria-hidden="true">
+              <div id="score-bar" class="score-bar"></div>
+            </div>
+          </div>
+
+          <!-- AI-written reason — styled as an editorial pull quote -->
+          <blockquote id="reason-line" class="reason-line" hidden></blockquote>
+
+          <div class="result-grid">
+            <div class="result-col result-col--strengths">
+              <h3 class="result-col-heading">
+                <svg width="10" height="10" viewBox="0 0 10 10" fill="none" aria-hidden="true"><path d="M1 5l3 3 5-5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                Strengths
+              </h3>
+              <ul id="strengths-list" class="result-list"></ul>
+            </div>
+            <div class="result-col result-col--weaknesses">
+              <h3 class="result-col-heading">
+                <svg width="10" height="10" viewBox="0 0 10 10" fill="none" aria-hidden="true"><path d="M2 2l6 6M8 2l-6 6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+                Weaknesses
+              </h3>
+              <ul id="weaknesses-list" class="result-list"></ul>
+            </div>
+          </div>
+
+          <div class="result-next">
+            <h3 class="result-col-heading">
+              Next steps
+            </h3>
+            <ul id="next-steps-list" class="result-list result-list--steps"></ul>
+          </div>
+
+          <div class="result-footer">
+            <button id="new-session" class="btn-outline">
+              Practice again
+            </button>
+          </div>
+        </div>
+
+      </section>
+
+      <footer class="site-footer" aria-label="Site footer">
+        <span class="footer-brand">Verdiq</span>
+        <span class="footer-dot" aria-hidden="true"></span>
+        <span class="footer-copy">© 2026</span>
+      </footer>
+
+    </div><!-- /.app-shell -->
+
+    <script type="module" src="./main.mjs"></script>
+  </body>
+</html>
