@@ -9,7 +9,7 @@ import { ThemeToggle } from "@/components/theme-toggle";
 import { UserButton } from "@/components/user-button";
 import { useSession } from "@/lib/auth-client";
 import { api } from "@/lib/api";
-import type { CategoryMeta, CategoryStats, LanguageMeta } from "@/lib/api";
+import type { CategoryMeta, CategoryStats } from "@/lib/api";
 import {
   ArrowLeftIcon,
   Loader2Icon,
@@ -53,7 +53,6 @@ export default function CategoryPage({ params }: { params: Promise<{ category: s
   const isAuthenticated = !!authSession?.user;
 
   const [meta, setMeta] = useState<CategoryMeta | null>(null);
-  const [languages, setLanguages] = useState<LanguageMeta[]>([]);
   const [stats, setStats] = useState<CategoryStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [starting, setStarting] = useState(false);
@@ -73,7 +72,6 @@ export default function CategoryPage({ params }: { params: Promise<{ category: s
     ]).then(([metaRes, dataRes]) => {
       const cat = metaRes.categories.find((c) => c.id === category);
       setMeta(cat ?? null);
-      setLanguages(metaRes.languages);
       setStats(dataRes.categoryStats[category] ?? null);
     }).catch((e) => console.error("Category page load error:", e)).finally(() => setLoading(false));
   }, [category]);
@@ -95,7 +93,6 @@ export default function CategoryPage({ params }: { params: Promise<{ category: s
     }
   }, [category, router]);
 
-  const isPracticalCoding = category === "practical_coding";
   const cardsRef = useScrollReveal([meta]);
 
   if (loading && !meta) {
@@ -231,24 +228,6 @@ export default function CategoryPage({ params }: { params: Promise<{ category: s
               })}
             </div>
           </div>
-
-          {/* Languages (only for practical_coding) */}
-          {isPracticalCoding && (
-            <div className="space-y-3">
-              <p className="text-xs font-semibold tracking-wide uppercase text-muted-foreground">
-                By Language
-              </p>
-              <div className="flex flex-wrap gap-2">
-                {languages.map((lang) => (
-                  <Link key={lang.id} href={`/practice/${category}/implementation?language=${lang.id}`}>
-                    <Button variant="outline" size="sm">
-                      {lang.label}
-                    </Button>
-                  </Link>
-                ))}
-              </div>
-            </div>
-          )}
         </section>
       )}
     </div>

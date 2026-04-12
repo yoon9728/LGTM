@@ -44,6 +44,8 @@ export default function SessionPage({ params }: { params: Promise<{ id: string }
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [session, setSession] = useState<Session | null>(null);
+  // Language selection for practical_coding (user picks before answering)
+  const [selectedLanguage, setSelectedLanguage] = useState<string | null>(null);
   // Code Review fields
   const [summary, setSummary] = useState("");
   const [findings, setFindings] = useState("");
@@ -59,17 +61,17 @@ export default function SessionPage({ params }: { params: Promise<{ id: string }
   const [explanation, setExplanation] = useState("");
   const [optimization, setOptimization] = useState("");
   // Practical Coding fields (block editor)
-  const [codeBlocks, setCodeBlocks] = useState<Block[]>([
+  const [codeBlocks, setCodeBlocks] = useState<Block[]>(() => [
     { id: crypto.randomUUID(), type: "code", language: "javascript", content: "" },
   ]);
   const [approach, setApproach] = useState("");
   const [complexity, setComplexity] = useState("");
   // Data Analysis blocks
-  const [queryBlocks, setQueryBlocks] = useState<Block[]>([
+  const [queryBlocks, setQueryBlocks] = useState<Block[]>(() => [
     { id: crypto.randomUUID(), type: "code", language: "sql", content: "" },
   ]);
   // Debugging fix blocks
-  const [fixBlocks, setFixBlocks] = useState<Block[]>([
+  const [fixBlocks, setFixBlocks] = useState<Block[]>(() => [
     { id: crypto.randomUUID(), type: "code", language: "javascript", content: "" },
   ]);
   const [evaluation, setEvaluation] = useState<Evaluation | null>(null);
@@ -86,18 +88,31 @@ export default function SessionPage({ params }: { params: Promise<{ id: string }
 
   // Load session
   useEffect(() => {
-    api.getSession(id).then((res) => {
+    api.getSession(id).then(async (res) => {
       setSession(res.session);
-      setStep("diff");
-      // Initialize block editor languages from question
-      const lang = res.session.question.language ?? "javascript";
+      const lang = res.session.language ?? res.session.question.language ?? null;
+      setSelectedLanguage(lang);
       const cat = res.session.question.category;
       if (cat === "practical_coding") {
-        setCodeBlocks([{ id: crypto.randomUUID(), type: "code", language: lang, content: "" }]);
+        const template = lang ? (res.session.question.templates?.[lang] ?? "") : "";
+        setCodeBlocks([{ id: crypto.randomUUID(), type: "code", language: lang ?? "javascript", content: template }]);
       } else if (cat === "data_analysis") {
         setQueryBlocks([{ id: crypto.randomUUID(), type: "code", language: "sql", content: "" }]);
       } else if (cat === "debugging") {
-        setFixBlocks([{ id: crypto.randomUUID(), type: "code", language: lang, content: "" }]);
+        setFixBlocks([{ id: crypto.randomUUID(), type: "code", language: lang ?? "javascript", content: "" }]);
+      }
+
+      // If session already answered, jump to result
+      if (res.session.status === "answer_submitted") {
+        try {
+          const retry = await api.retryEvaluation(res.session.id);
+          setEvaluation(retry.evaluation);
+          setStep("result");
+        } catch {
+          setStep("diff"); // fallback: show problem
+        }
+      } else {
+        setStep("diff");
       }
     }).catch(() => {
       setError("Session not found");
@@ -207,9 +222,21 @@ export default function SessionPage({ params }: { params: Promise<{ id: string }
           localStorage.setItem("lgtm_guest_completions", String(newCount));
           setShowSignupPrompt(true);
         }
-      } catch (e) {
-        console.error("Submit answer failed:", e);
-        setError("Failed to submit answer. Please try again.");
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : "";
+        if (msg.includes("409") && session) {
+          // Answer already exists — fetch the existing evaluation
+          try {
+            const retry = await api.retryEvaluation(session.id);
+            setEvaluation(retry.evaluation);
+            setStep("result");
+          } catch {
+            setError("Answer already submitted for this session.");
+          }
+        } else {
+          console.error("Submit answer failed:", err);
+          setError("Failed to submit answer. Please try again.");
+        }
       } finally {
         setLoading(false);
       }
@@ -224,6 +251,7 @@ export default function SessionPage({ params }: { params: Promise<{ id: string }
       const { session: newSession } = await api.createSession({
         category: session.question.category,
         type: session.question.type,
+        language: session.language ?? undefined,
       });
       router.push(`/practice/session/${newSession.id}`);
     } catch {
@@ -232,6 +260,8 @@ export default function SessionPage({ params }: { params: Promise<{ id: string }
   }, [session, router]);
 
   const category = session?.question.category ?? "code_review";
+  /** User-chosen language (session level) > question-level language */
+  const sessionLanguage = selectedLanguage ?? session?.language ?? session?.question.language ?? null;
   const backUrl = session ? `/practice/${category}/${session.question.type}` : "/practice";
   const categoryLabel = CATEGORY_LABELS[category] ?? "Practice";
   const guestLimitReached = !isAuthenticated && guestCompletions >= GUEST_LIMIT;
@@ -248,7 +278,16 @@ export default function SessionPage({ params }: { params: Promise<{ id: string }
     );
   }
 
-  const handleStartAnalysis = () => {
+  const handleStartAnalysis = async () => {
+    // Persist language choice to session for practical_coding
+    if (category === "practical_coding" && selectedLanguage && session) {
+      try {
+        await api.updateSession(session.id, { language: selectedLanguage });
+        setSession({ ...session, language: selectedLanguage });
+      } catch {
+        // Non-blocking — evaluation will still use selectedLanguage from blocks
+      }
+    }
     setStep("analysis");
   };
 
@@ -264,19 +303,57 @@ export default function SessionPage({ params }: { params: Promise<{ id: string }
           <span className="text-[10px] font-mono tracking-wide border border-border rounded px-1.5 py-0.5 text-muted-foreground">
             {session?.question.type.replace(/_/g, " ").toUpperCase()}
           </span>
-          {session?.question.language && (
+          {sessionLanguage && (
             <span className="text-[10px] font-mono tracking-wide border border-border rounded px-1.5 py-0.5 text-muted-foreground">
-              {session.question.language === "c_cpp" ? "C/C++" : session.question.language.toUpperCase()}
+              {sessionLanguage === "c_cpp" ? "C/C++" : sessionLanguage.toUpperCase()}
             </span>
           )}
         </div>
         <h2 className="text-xl font-semibold tracking-tight">{session?.question.title}</h2>
-        <p className="text-sm text-muted-foreground leading-relaxed">{session?.question.prompt}</p>
+        <p className="text-sm text-muted-foreground leading-relaxed whitespace-pre-line">{session?.question.prompt}</p>
       </div>
-      <DiffViewer diff={session?.question.diff ?? ""} />
+      {category !== "practical_coding" && (
+        <DiffViewer diff={session?.question.diff ?? ""} />
+      )}
       {step === "diff" && (
-        <div className="pt-2">
-          <Button onClick={handleStartAnalysis}>
+        <div className="pt-2 space-y-4">
+          {/* Language picker for practical_coding */}
+          {category === "practical_coding" && (
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-foreground">
+                Choose your language
+              </label>
+              <div className="flex flex-wrap gap-1.5">
+                {[
+                  { id: "python", label: "Python" },
+                  { id: "java", label: "Java" },
+                  { id: "javascript", label: "JavaScript" },
+                  { id: "typescript", label: "TypeScript" },
+                  { id: "csharp", label: "C#" },
+                  { id: "c_cpp", label: "C/C++" },
+                  { id: "rust", label: "Rust" },
+                  { id: "go", label: "Go" },
+                  { id: "kotlin", label: "Kotlin" },
+                ].map((lang) => (
+                  <Button
+                    type="button"
+                    key={lang.id}
+                    variant={selectedLanguage === lang.id ? "default" : "outline"}
+                    size="sm"
+                    className="text-xs h-7"
+                    onClick={() => {
+                      setSelectedLanguage(lang.id);
+                      const template = session?.question.templates?.[lang.id] ?? "";
+                      setCodeBlocks([{ id: crypto.randomUUID(), type: "code", language: lang.id, content: template }]);
+                    }}
+                  >
+                    {lang.label}
+                  </Button>
+                ))}
+              </div>
+            </div>
+          )}
+          <Button type="button" onClick={handleStartAnalysis} disabled={category === "practical_coding" && !selectedLanguage}>
             {category === "code_review" && "I've read the code — write my review"}
             {category === "system_design" && "I've read the requirements — write my design"}
             {category === "debugging" && "I've read the code — diagnose the bug"}
@@ -437,7 +514,7 @@ export default function SessionPage({ params }: { params: Promise<{ id: string }
                 <BlockEditor
                   blocks={fixBlocks}
                   onChange={setFixBlocks}
-                  defaultLanguage={session.question.language ?? "javascript"}
+                  defaultLanguage={sessionLanguage ?? "javascript"}
                 />
               )}
             </div>
@@ -497,9 +574,9 @@ export default function SessionPage({ params }: { params: Promise<{ id: string }
           <>
             <div className="space-y-2">
               <label className="text-sm font-medium text-foreground">
-                Code {session.question.language && (
+                Code {sessionLanguage && (
                   <span className="text-[10px] font-mono tracking-wide border border-border rounded px-1.5 py-0.5 text-muted-foreground ml-1.5">
-                    {session.question.language === "c_cpp" ? "C/C++" : session.question.language.toUpperCase()}
+                    {sessionLanguage === "c_cpp" ? "C/C++" : sessionLanguage.toUpperCase()}
                   </span>
                 )}
               </label>
@@ -511,7 +588,8 @@ export default function SessionPage({ params }: { params: Promise<{ id: string }
                 <BlockEditor
                   blocks={codeBlocks}
                   onChange={setCodeBlocks}
-                  defaultLanguage={session.question.language ?? "javascript"}
+                  defaultLanguage={sessionLanguage ?? "javascript"}
+                  templates={session?.question.templates}
                 />
               )}
             </div>
@@ -581,7 +659,7 @@ export default function SessionPage({ params }: { params: Promise<{ id: string }
               </Button>
             </Link>
             {guestCompletions < GUEST_LIMIT && (
-              <Button size="sm" variant="ghost" onClick={() => setShowSignupPrompt(false)}>
+              <Button type="button" size="sm" variant="ghost" onClick={() => setShowSignupPrompt(false)}>
                 Maybe later
               </Button>
             )}
@@ -601,7 +679,7 @@ export default function SessionPage({ params }: { params: Promise<{ id: string }
             <Link href={backUrl}>
               <Button variant="outline">Back to questions</Button>
             </Link>
-            <Button variant="outline" onClick={startNewRandom} disabled={loading}>
+            <Button type="button" variant="outline" onClick={startNewRandom} disabled={loading}>
               {loading ? <Loader2Icon className="size-4 animate-spin" /> : (
                 <>
                   <ShuffleIcon className="size-3.5 mr-1.5" />

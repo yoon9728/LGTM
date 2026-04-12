@@ -32,12 +32,14 @@ interface BlockEditorProps {
   blocks: Block[];
   onChange: (blocks: Block[]) => void;
   defaultLanguage?: string;
+  templates?: Record<string, string>;
 }
 
 export function BlockEditor({
   blocks,
   onChange,
   defaultLanguage,
+  templates,
 }: BlockEditorProps) {
   const [showLanguageMenu, setShowLanguageMenu] = useState<string | null>(null);
   // Use a ref to always have the latest blocks for callbacks
@@ -54,10 +56,19 @@ export function BlockEditor({
     onChangeRef.current(updated);
   }, []);
 
+  const templatesRef = useRef(templates);
+  templatesRef.current = templates;
+
   const updateBlockLanguage = useCallback((id: string, language: string) => {
-    const updated = blocksRef.current.map((b) =>
-      b.id === id ? { ...b, language } : b
-    );
+    const tpl = templatesRef.current;
+    const updated = blocksRef.current.map((b) => {
+      if (b.id !== id) return b;
+      const newContent = tpl?.[language] ?? "";
+      // Swap content if it's empty or matches a previous template
+      const oldTemplate = tpl?.[b.language ?? ""] ?? "";
+      const shouldSwap = !b.content || b.content === oldTemplate;
+      return { ...b, language, ...(shouldSwap ? { content: newContent } : {}) };
+    });
     onChangeRef.current(updated);
     setShowLanguageMenu(null);
   }, []);
@@ -113,6 +124,7 @@ export function BlockEditor({
               {block.type === "code" && (
                 <div className="relative">
                   <button
+                    type="button"
                     onClick={() =>
                       setShowLanguageMenu(
                         showLanguageMenu === block.id ? null : block.id
@@ -128,6 +140,7 @@ export function BlockEditor({
                     <div className="absolute z-50 top-full left-0 mt-1 w-44 max-h-48 overflow-auto rounded-md border border-border bg-popover shadow-md py-1">
                       {languages.map((lang) => (
                         <button
+                          type="button"
                           key={lang.id}
                           onClick={() =>
                             updateBlockLanguage(block.id, lang.id)
@@ -150,6 +163,7 @@ export function BlockEditor({
             {/* Block actions */}
             <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
               <button
+                type="button"
                 onClick={() => moveBlock(block.id, "up")}
                 disabled={idx === 0}
                 className="p-1 rounded hover:bg-accent disabled:opacity-30 transition-colors"
@@ -157,6 +171,7 @@ export function BlockEditor({
                 <ChevronUpIcon className="size-3.5" />
               </button>
               <button
+                type="button"
                 onClick={() => moveBlock(block.id, "down")}
                 disabled={idx === blocks.length - 1}
                 className="p-1 rounded hover:bg-accent disabled:opacity-30 transition-colors"
@@ -165,6 +180,7 @@ export function BlockEditor({
               </button>
               {blocks.length > 1 && (
                 <button
+                  type="button"
                   onClick={() => removeBlock(block.id)}
                   className="p-1 rounded hover:bg-destructive/10 hover:text-destructive transition-colors"
                 >

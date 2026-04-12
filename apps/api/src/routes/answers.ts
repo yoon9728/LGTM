@@ -1,8 +1,11 @@
 import { Hono } from "hono";
+import { eq } from "drizzle-orm";
 import { db, type Answer } from "../data/store.js";
 import * as questions from "../data/questions.js";
 import { evaluate } from "../services/evaluation.js";
 import { optionalAuth, type AuthUser } from "../middleware/auth.js";
+import { getPgDb } from "../db/index.js";
+import { questions as questionsTable } from "../db/schema.js";
 
 export const answerRoutes = new Hono()
   .use("*", optionalAuth)
@@ -142,7 +145,24 @@ export const answerRoutes = new Hono()
 
     if (body.sessionId) await db.sessions.updateStatus(body.sessionId, "answer_submitted");
 
-    const question = questions.getById(answer.questionId);
+    // Prefer DB question (has AI-generated rubric) over in-memory fallback
+    let question = questions.getById(answer.questionId);
+    const [dbQuestion] = await getPgDb()
+      .select()
+      .from(questionsTable)
+      .where(eq(questionsTable.id, answer.questionId));
+    if (dbQuestion?.rubric) {
+      question = {
+        ...question!,
+        rubric: dbQuestion.rubric as { mustCover: string[]; strongSignals: string[]; weakPatterns: string[] },
+      };
+    }
+
+    // Use session-level language (user's choice) over question-level language
+    if (session?.language && question) {
+      question = { ...question, language: session.language };
+    }
+
     const evaluation = await evaluate(answer, question);
     return c.json({ ok: true, answer, evaluation }, 201);
   });

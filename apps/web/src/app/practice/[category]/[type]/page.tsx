@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, use, useRef } from "react";
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { ThemeToggle } from "@/components/theme-toggle";
@@ -53,8 +53,6 @@ export default function TypeQuestionsPage({
 }) {
   const { category, type } = use(params);
   const router = useRouter();
-  const searchParams = useSearchParams();
-  const languageFilter = searchParams.get("language");
 
   const { data: authSession, isPending } = useSession();
   const isAuthenticated = !!authSession?.user;
@@ -77,7 +75,7 @@ export default function TypeQuestionsPage({
   useEffect(() => {
     Promise.all([
       api.getMeta(),
-      api.getQuestions({ category, type, language: languageFilter ?? undefined }),
+      api.getQuestions({ category, type }),
     ]).then(([metaRes, dataRes]) => {
       const cat = metaRes.categories.find((c) => c.id === category);
       setCatMeta(cat ?? null);
@@ -86,15 +84,15 @@ export default function TypeQuestionsPage({
       setQuestions(dataRes.questions);
       setStats(dataRes.categoryStats[category]?.types[type] ?? null);
     }).catch(() => {}).finally(() => setLoading(false));
-  }, [category, type, languageFilter]);
+  }, [category, type]);
 
   useEffect(() => {
     if (isPending || !isAuthenticated) return;
-    api.getQuestions({ category, type, language: languageFilter ?? undefined }).then((dataRes) => {
+    api.getQuestions({ category, type }).then((dataRes) => {
       setQuestions(dataRes.questions);
       setStats(dataRes.categoryStats[category]?.types[type] ?? null);
     }).catch(() => {});
-  }, [isPending, isAuthenticated, category, type, languageFilter]);
+  }, [isPending, isAuthenticated, category, type]);
 
   const startSession = useCallback(async (questionId?: string) => {
     setStarting(true);
@@ -103,13 +101,12 @@ export default function TypeQuestionsPage({
         questionId,
         category: questionId ? undefined : category,
         type: questionId ? undefined : type,
-        language: questionId ? undefined : (languageFilter ?? undefined),
       });
       router.push(`/practice/session/${session.id}`);
     } catch {
       setStarting(false);
     }
-  }, [category, type, languageFilter, router]);
+  }, [category, type, router]);
 
   const cardsRef = useScrollReveal([questions]);
 
@@ -132,9 +129,7 @@ export default function TypeQuestionsPage({
     );
   }
 
-  const displayLabel = languageFilter
-    ? `${typeMeta.label} · ${languageFilter.toUpperCase()}`
-    : typeMeta.label;
+  const displayLabel = typeMeta.label;
 
   return (
     <div className="max-w-4xl mx-auto px-6 pb-24">
@@ -221,24 +216,6 @@ export default function TypeQuestionsPage({
             )}
           </Button>
 
-          {/* Language filter pills (for practical_coding) */}
-          {category === "practical_coding" && (
-            <div className="flex flex-wrap gap-1.5">
-              <Link href={`/practice/${category}/${type}`}>
-                <Button variant={!languageFilter ? "default" : "outline"} size="sm" className="text-xs h-7">
-                  All
-                </Button>
-              </Link>
-              {["python", "java", "javascript", "typescript", "c_cpp", "rust", "go", "kotlin"].map((lang) => (
-                <Link key={lang} href={`/practice/${category}/${type}?language=${lang}`}>
-                  <Button variant={languageFilter === lang ? "default" : "outline"} size="sm" className="text-xs h-7">
-                    {lang === "c_cpp" ? "C/C++" : lang === "javascript" ? "JS" : lang === "typescript" ? "TS" : lang.charAt(0).toUpperCase() + lang.slice(1)}
-                  </Button>
-                </Link>
-              ))}
-            </div>
-          )}
-
           {/* Question Cards */}
           {questions.length === 0 ? (
             <div className="text-center py-12">
@@ -255,16 +232,9 @@ export default function TypeQuestionsPage({
                 >
                   <div className="flex items-start justify-between gap-4">
                     <div className="min-w-0 space-y-1.5">
-                      <div className="flex items-center gap-2">
-                        <h3 className="text-sm font-semibold text-foreground group-hover:text-primary transition-colors">
-                          {q.title}
-                        </h3>
-                        {q.language && (
-                          <span className="text-[10px] font-mono tracking-wide border border-border rounded px-1.5 py-0.5 text-muted-foreground shrink-0">
-                            {q.language === "c_cpp" ? "C/C++" : q.language.toUpperCase()}
-                          </span>
-                        )}
-                      </div>
+                      <h3 className="text-sm font-semibold text-foreground group-hover:text-primary transition-colors">
+                        {q.title}
+                      </h3>
                       <p className="text-xs text-muted-foreground leading-relaxed line-clamp-2">
                         {q.prompt}
                       </p>

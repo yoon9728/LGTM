@@ -22,24 +22,25 @@ const app = new Hono();
 
 app.use("*", cors({
   origin: process.env.WEB_ORIGIN ?? "http://localhost:4173",
-  allowMethods: ["GET", "POST", "OPTIONS"],
+  allowMethods: ["GET", "POST", "PATCH", "OPTIONS"],
   allowHeaders: ["Content-Type"],
   credentials: true,
 }));
 
-// Global rate limit: 100 requests per minute per IP
-app.use("*", rateLimit({ windowMs: 60_000, max: 100, keyPrefix: "global" }));
-
-// Strict rate limit on answer submission (triggers OpenAI call)
-app.use("/practice/answers", rateLimit({ windowMs: 60_000, max: 10, keyPrefix: "answers" }));
+// Better Auth handler — all /api/auth/* routes (before rate limit so auth isn't throttled)
+app.on(["POST", "GET"], "/api/auth/*", (c) => {
+  return getAuth().handler(c.req.raw);
+});
 
 app.get("/", (c) => c.json({ ok: true, service: "lgtm-api" }));
 app.get("/health", (c) => c.json({ ok: true }));
 
-// Better Auth handler — all /api/auth/* routes
-app.on(["POST", "GET"], "/api/auth/*", (c) => {
-  return getAuth().handler(c.req.raw);
-});
+// Global rate limit: 300 requests per minute per IP (excludes auth routes above)
+app.use("/practice/*", rateLimit({ windowMs: 60_000, max: 300, keyPrefix: "global" }));
+app.use("/users/*", rateLimit({ windowMs: 60_000, max: 300, keyPrefix: "global" }));
+
+// Strict rate limit on answer submission (triggers OpenAI call)
+app.use("/practice/answers", rateLimit({ windowMs: 60_000, max: 10, keyPrefix: "answers" }));
 
 app.route("/practice/sessions", sessionRoutes);
 app.route("/practice/answers", answerRoutes);

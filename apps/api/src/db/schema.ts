@@ -78,6 +78,7 @@ export const sessions = pgTable("sessions", {
   id: text("id").primaryKey(),
   userId: text("user_id").references(() => user.id),
   questionId: text("question_id").references(() => questions.id).notNull(),
+  language: text("language"), // user-chosen language for practical_coding
   status: text("status", { enum: ["question_ready", "answer_submitted"] }).notNull().default("question_ready"),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   completedAt: timestamp("completed_at", { withTimezone: true }),

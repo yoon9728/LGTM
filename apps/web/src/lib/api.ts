@@ -21,6 +21,7 @@ export interface Question {
   title: string;
   prompt: string;
   diff: string;
+  templates?: Record<string, string>;
 }
 
 export interface QuestionListItem {
@@ -60,6 +61,7 @@ export interface LanguageMeta {
 export interface Session {
   id: string;
   candidateId: string;
+  language: string | null;
   status: string;
   question: Question;
 }
@@ -160,6 +162,12 @@ export const api = {
   getSession: (id: string) =>
     request<{ session: Session }>(`/practice/sessions/${id}`),
 
+  updateSession: (id: string, body: { language?: string }) =>
+    request<{ session: Session }>(`/practice/sessions/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify(body),
+    }),
+
   submitAnswer: (body: {
     sessionId: string;
     questionId: string;
@@ -170,6 +178,9 @@ export const api = {
       "/practice/answers",
       { method: "POST", body: JSON.stringify(body) }
     ),
+
+  retryEvaluation: (sessionId: string) =>
+    request<{ answer: { id: string }; evaluation: Evaluation }>(`/practice/sessions/${sessionId}/retry-evaluation`, { method: "POST" }),
 
   getHistory: () =>
     request<{ history: HistoryEntry[] }>("/practice/history"),

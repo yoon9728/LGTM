@@ -13,6 +13,7 @@ import type { Question } from "./questions.js";
 export interface Session {
   id: string;
   candidateId: string;
+  language: string | null;
   status: "question_ready" | "answer_submitted";
   question: Question;
   createdAt: string;
@@ -80,12 +81,14 @@ function toSession(row: {
   id: string;
   userId: string | null;
   questionId: string;
+  language: string | null;
   status: string;
   createdAt: Date;
 }, question: Question): Session {
   return {
     id: row.id,
     candidateId: row.userId ?? "guest",
+    language: row.language ?? null,
     status: row.status as Session["status"],
     question,
     createdAt: row.createdAt.toISOString(),
@@ -155,6 +158,7 @@ export const db = {
           id: s.id,
           userId: (s.candidateId === "local-test-user" || s.candidateId === "guest") ? null : s.candidateId,
           questionId: s.question.id,
+          language: s.language,
           status: s.status,
         })
         .returning();
@@ -200,6 +204,12 @@ export const db = {
           status,
           ...(status === "answer_submitted" ? { completedAt: new Date() } : {}),
         })
+        .where(eq(sessionsTable.id, id));
+    },
+    async updateLanguage(id: string, language: string): Promise<void> {
+      await getPgDb()
+        .update(sessionsTable)
+        .set({ language })
         .where(eq(sessionsTable.id, id));
     },
   },

@@ -72,14 +72,35 @@ export const sessionRoutes = new Hono()
       question = questions.getRandomByCategory(body.category, body.type, body.language, isGuest);
     }
 
+    // For practical_coding: use requested language, or fall back to question's language
+    const sessionLanguage = body.language ?? question.language ?? null;
+
     const session = await db.sessions.insert({
       id: crypto.randomUUID(),
       candidateId: user?.id ?? "guest",
+      language: sessionLanguage,
       status: "question_ready",
       question,
       createdAt: new Date().toISOString(),
     });
+    // Ensure templates are included (in-memory only)
+    if (question.templates) session.question.templates = question.templates;
     return c.json({ ok: true, session, isGuest }, 201);
+  })
+
+  .patch("/:id", async (c) => {
+    const user = c.get("user") as AuthUser | null;
+    const session = await db.sessions.get(c.req.param("id"));
+    if (!session) return c.json({ error: "Session not found" }, 404);
+    if (session.candidateId !== "guest" && user?.id !== session.candidateId) {
+      return c.json({ error: "Forbidden" }, 403);
+    }
+    const body = await c.req.json<{ language?: string }>();
+    if (body.language) {
+      await db.sessions.updateLanguage(session.id, body.language);
+      session.language = body.language;
+    }
+    return c.json({ ok: true, session });
   })
 
   .get("/:id", async (c) => {
@@ -89,6 +110,11 @@ export const sessionRoutes = new Hono()
     // Allow access only to owner or guest sessions
     if (session.candidateId !== "guest" && user?.id !== session.candidateId) {
       return c.json({ error: "Forbidden" }, 403);
+    }
+    // Merge templates from in-memory (DB doesn't store templates)
+    const inMemoryQ = questions.getById(session.question.id);
+    if (inMemoryQ?.templates) {
+      session.question.templates = inMemoryQ.templates;
     }
     return c.json({ ok: true, session });
   })
