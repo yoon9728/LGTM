@@ -60,8 +60,8 @@ export const adminRoutes = new Hono()
       const rubric = await generateRubric(body);
       return c.json({ ok: true, rubric });
     } catch (err) {
-      const msg = err instanceof Error ? err.message : "Unknown error";
-      return c.json({ error: `Rubric generation failed: ${msg}` }, 500);
+      console.error("Rubric generation failed:", err);
+      return c.json({ error: "Rubric generation failed. Check server logs." }, 500);
     }
   })
 
@@ -96,8 +96,8 @@ export const adminRoutes = new Hono()
 
       return c.json({ ok: true, rubric, saved: shouldSave });
     } catch (err) {
-      const msg = err instanceof Error ? err.message : "Unknown error";
-      return c.json({ error: `Rubric generation failed: ${msg}` }, 500);
+      console.error("Rubric generation failed:", err);
+      return c.json({ error: "Rubric generation failed. Check server logs." }, 500);
     }
   })
 

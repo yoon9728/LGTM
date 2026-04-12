@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, use, useRef } from "react";
+import { useState, useEffect, useCallback, use } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
@@ -10,6 +10,8 @@ import { UserButton } from "@/components/user-button";
 import { useSession } from "@/lib/auth-client";
 import { api } from "@/lib/api";
 import type { CategoryMeta, CategoryStats } from "@/lib/api";
+import { useScrollReveal } from "@/hooks/useScrollReveal";
+import { GUEST_LIMIT, GUEST_STORAGE_KEY } from "@/lib/guest";
 import {
   ArrowLeftIcon,
   Loader2Icon,
@@ -18,33 +20,6 @@ import {
   ShuffleIcon,
   ArrowRightIcon,
 } from "lucide-react";
-
-const GUEST_LIMIT = 4;
-
-function useScrollReveal(deps: unknown[] = []) {
-  const ref = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-    const children = el.querySelectorAll(".scroll-reveal:not(.revealed)");
-    if (children.length === 0) return;
-    const observer = new IntersectionObserver(
-      (entries) => {
-        entries.forEach((entry, i) => {
-          if (entry.isIntersecting) {
-            setTimeout(() => (entry.target as HTMLElement).classList.add("revealed"), i * 80);
-            observer.unobserve(entry.target);
-          }
-        });
-      },
-      { threshold: 0.1, rootMargin: "0px 0px -40px 0px" }
-    );
-    children.forEach((child) => observer.observe(child));
-    return () => observer.disconnect();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, deps);
-  return ref;
-}
 
 export default function CategoryPage({ params }: { params: Promise<{ category: string }> }) {
   const { category } = use(params);
@@ -59,7 +34,7 @@ export default function CategoryPage({ params }: { params: Promise<{ category: s
   const [guestCompletions, setGuestCompletions] = useState(0);
 
   useEffect(() => {
-    const stored = localStorage.getItem("lgtm_guest_completions");
+    const stored = localStorage.getItem(GUEST_STORAGE_KEY);
     if (stored) setGuestCompletions(parseInt(stored) || 0);
   }, []);
 

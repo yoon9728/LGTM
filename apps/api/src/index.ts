@@ -8,6 +8,7 @@ import "./types.js"; // Register Hono context variable types
 import { serve } from "@hono/node-server";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
+import { bodyLimit } from "hono/body-limit";
 import { sessionRoutes } from "./routes/sessions.js";
 import { answerRoutes } from "./routes/answers.js";
 import { questionRoutes } from "./routes/questions.js";
@@ -18,7 +19,22 @@ import { adminRoutes } from "./routes/admin.js";
 import { getAuth } from "./auth.js";
 import { rateLimit } from "./middleware/rate-limit.js";
 
+// ── Startup validations ──
+if (!process.env.OPENAI_API_KEY) {
+  console.warn("WARNING: OPENAI_API_KEY is not set. Evaluations will fail.");
+}
+if (process.env.NODE_ENV === "production" && !process.env.WEB_ORIGIN) {
+  throw new Error("WEB_ORIGIN must be set in production");
+}
+const authSecret = process.env.BETTER_AUTH_SECRET;
+if (!authSecret || authSecret.length < 32) {
+  console.warn("WARNING: BETTER_AUTH_SECRET is missing or too short (min 32 chars).");
+}
+
 const app = new Hono();
+
+// Global body size limit — 512KB (prevents OOM from oversized payloads)
+app.use("*", bodyLimit({ maxSize: 512 * 1024 }));
 
 app.use("*", cors({
   origin: process.env.WEB_ORIGIN ?? "http://localhost:4173",
@@ -38,6 +54,7 @@ app.get("/health", (c) => c.json({ ok: true }));
 // Global rate limit: 300 requests per minute per IP (excludes auth routes above)
 app.use("/practice/*", rateLimit({ windowMs: 60_000, max: 300, keyPrefix: "global" }));
 app.use("/users/*", rateLimit({ windowMs: 60_000, max: 300, keyPrefix: "global" }));
+app.use("/admin/*", rateLimit({ windowMs: 60_000, max: 20, keyPrefix: "admin" }));
 
 // Strict rate limit on answer submission (triggers OpenAI call)
 app.use("/practice/answers", rateLimit({ windowMs: 60_000, max: 10, keyPrefix: "answers" }));

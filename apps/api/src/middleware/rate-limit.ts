@@ -1,4 +1,5 @@
 import type { Context, Next } from "hono";
+import { getClientIp } from "../lib/ip.js";
 
 interface RateLimitEntry {
   count: number;
@@ -19,10 +20,7 @@ export function rateLimit(opts: { windowMs: number; max: number; keyPrefix?: str
   const { windowMs, max, keyPrefix = "rl" } = opts;
 
   return async (c: Context, next: Next) => {
-    const ip =
-      c.req.header("x-forwarded-for")?.split(",")[0]?.trim() ??
-      c.req.header("x-real-ip") ??
-      "unknown";
+    const ip = getClientIp(c);
     const key = `${keyPrefix}:${ip}`;
     const now = Date.now();
 

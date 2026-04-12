@@ -185,7 +185,8 @@ export async function generateRubric(input: RubricInput): Promise<Rubric> {
 
   if (!res.ok) {
     const body = await res.text();
-    throw new Error(`OpenAI API error ${res.status}: ${body}`);
+    console.error(`OpenAI API error ${res.status}:`, body);
+    throw new Error(`OpenAI API error (status ${res.status})`);
   }
 
   const payload = (await res.json()) as {

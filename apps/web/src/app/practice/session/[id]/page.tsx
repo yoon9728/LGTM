@@ -15,14 +15,13 @@ import { UserButton } from "@/components/user-button";
 import { useSession } from "@/lib/auth-client";
 import { api } from "@/lib/api";
 import type { Session, Evaluation } from "@/lib/api";
+import { GUEST_LIMIT, GUEST_STORAGE_KEY } from "@/lib/guest";
 import {
   ArrowRightIcon,
   ArrowLeftIcon,
   Loader2Icon,
   ShuffleIcon,
 } from "lucide-react";
-
-const GUEST_LIMIT = 4;
 
 const CATEGORY_LABELS: Record<string, string> = {
   code_review: "Code Review",
@@ -82,7 +81,7 @@ export default function SessionPage({ params }: { params: Promise<{ id: string }
   const rightPanelRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    const stored = localStorage.getItem("lgtm_guest_completions");
+    const stored = localStorage.getItem(GUEST_STORAGE_KEY);
     if (stored) setGuestCompletions(parseInt(stored) || 0);
   }, []);
 
@@ -219,12 +218,12 @@ export default function SessionPage({ params }: { params: Promise<{ id: string }
         if (!isAuthenticated) {
           const newCount = guestCompletions + 1;
           setGuestCompletions(newCount);
-          localStorage.setItem("lgtm_guest_completions", String(newCount));
+          localStorage.setItem(GUEST_STORAGE_KEY, String(newCount));
           setShowSignupPrompt(true);
         }
       } catch (err) {
-        const msg = err instanceof Error ? err.message : "";
-        if (msg.includes("409") && session) {
+        const status = (err as { status?: number }).status;
+        if (status === 409 && session) {
           // Answer already exists — fetch the existing evaluation
           try {
             const retry = await api.retryEvaluation(session.id);
@@ -234,14 +233,14 @@ export default function SessionPage({ params }: { params: Promise<{ id: string }
             setError("Answer already submitted for this session.");
           }
         } else {
-          console.error("Submit answer failed:", err);
+          if (process.env.NODE_ENV === "development") console.error("Submit answer failed:", err);
           setError("Failed to submit answer. Please try again.");
         }
       } finally {
         setLoading(false);
       }
     },
-    [buildAnswerPayload, isFormValid, isAuthenticated, guestCompletions]
+    [buildAnswerPayload, isFormValid, isAuthenticated, guestCompletions, session]
   );
 
   const startNewRandom = useCallback(async () => {

@@ -3,7 +3,7 @@ import { eq } from "drizzle-orm";
 import { db, type Answer } from "../data/store.js";
 import * as questions from "../data/questions.js";
 import { evaluate } from "../services/evaluation.js";
-import { optionalAuth, type AuthUser } from "../middleware/auth.js";
+import { optionalAuth } from "../middleware/auth.js";
 import { getPgDb } from "../db/index.js";
 import { questions as questionsTable } from "../db/schema.js";
 
@@ -43,7 +43,6 @@ export const answerRoutes = new Hono()
     // Validation
     const errors: string[] = [];
     if (!body.sessionId) errors.push("sessionId is required.");
-    if (!body.questionId) errors.push("questionId is required.");
 
     // Input size limits (max 50KB per text field)
     const MAX_FIELD_LEN = 50_000;
@@ -117,27 +116,40 @@ export const answerRoutes = new Hono()
       }
     }
 
-    if (errors.length > 0) return c.json({ error: { code: "invalid_input", details: errors } }, 400);
-
-    // Duplicate guard
-    if (body.sessionId && await db.answers.findBySessionId(body.sessionId)) {
-      return c.json({ error: "An answer for this session already exists." }, 409);
-    }
-
-    const session = body.sessionId ? await db.sessions.get(body.sessionId) : undefined;
-
-    // Ownership check — only session owner or guest sessions allowed
-    if (session) {
-      const user = c.get("user") as AuthUser | null;
-      if (session.candidateId !== "guest" && user?.id !== session.candidateId) {
-        return c.json({ error: "Forbidden" }, 403);
+    // Validate blocks array size
+    if (body.blocks) {
+      if (body.blocks.length > 20) errors.push("Too many blocks (max 20).");
+      for (const block of body.blocks) {
+        if (typeof block.content === "string" && block.content.length > MAX_FIELD_LEN) {
+          errors.push("Block content exceeds maximum length.");
+          break;
+        }
       }
     }
 
+    if (errors.length > 0) return c.json({ error: { code: "invalid_input", details: errors } }, 400);
+
+    // Validate session exists first
+    const session = body.sessionId ? await db.sessions.get(body.sessionId) : undefined;
+    if (!session) return c.json({ error: "Session not found" }, 404);
+
+    // Ownership check — only session owner or guest sessions allowed
+    const user = c.get("user");
+    const isOwner = session.candidateId === "guest" || user?.id === session.candidateId;
+    if (!isOwner) return c.json({ error: "Forbidden" }, 403);
+
+    // Duplicate guard
+    if (await db.answers.findBySessionId(session.id)) {
+      return c.json({ error: "An answer for this session already exists." }, 409);
+    }
+
+    // Always derive questionId from session — never trust client value
+    const questionId = session.question.id;
+
     const answer = await db.answers.insert({
       id: crypto.randomUUID(),
-      sessionId: body.sessionId ?? "",
-      questionId: body.questionId ?? session?.question?.id ?? "",
+      sessionId: session.id,
+      questionId,
       review: content as Answer["review"],
       status: "submitted",
       createdAt: new Date().toISOString(),

@@ -3,9 +3,14 @@ import { db } from "../data/store.js";
 import * as questions from "../data/questions.js";
 import { evaluate } from "../services/evaluation.js";
 import { optionalAuth, type AuthUser } from "../middleware/auth.js";
+import { getClientIp } from "../lib/ip.js";
+import { VALID_LANGUAGES } from "../lib/constants.js";
 
 const GUEST_SESSION_LIMIT = 4;
 const guestUsage = new Map<string, { count: number; resetAt: number }>();
+
+// Per-session retry counter to prevent OpenAI cost abuse
+const retryUsage = new Map<string, number>();
 
 // Clean expired entries every 10 minutes
 setInterval(() => {
@@ -15,17 +20,11 @@ setInterval(() => {
   }
 }, 10 * 60 * 1000).unref();
 
-function getClientIp(c: { req: { header: (name: string) => string | undefined } }): string {
-  return c.req.header("x-forwarded-for")?.split(",")[0]?.trim()
-    ?? c.req.header("x-real-ip")
-    ?? "unknown";
-}
-
 export const sessionRoutes = new Hono()
   .use("*", optionalAuth)
 
   .get("/", async (c) => {
-    const user = c.get("user") as AuthUser | null;
+    const user = c.get("user");
     if (user) {
       return c.json({ ok: true, sessions: await db.sessions.listByUser(user.id) });
     }
@@ -33,7 +32,7 @@ export const sessionRoutes = new Hono()
   })
 
   .post("/", async (c) => {
-    const user = c.get("user") as AuthUser | null;
+    const user = c.get("user");
     const isGuest = !user;
     const body = await c.req.json().catch(() => ({})) as {
       questionId?: string;
@@ -89,14 +88,17 @@ export const sessionRoutes = new Hono()
   })
 
   .patch("/:id", async (c) => {
-    const user = c.get("user") as AuthUser | null;
+    const user = c.get("user");
     const session = await db.sessions.get(c.req.param("id"));
     if (!session) return c.json({ error: "Session not found" }, 404);
-    if (session.candidateId !== "guest" && user?.id !== session.candidateId) {
-      return c.json({ error: "Forbidden" }, 403);
-    }
+    const isOwner = session.candidateId === "guest" || user?.id === session.candidateId;
+    if (!isOwner) return c.json({ error: "Forbidden" }, 403);
+
     const body = await c.req.json<{ language?: string }>();
     if (body.language) {
+      if (!VALID_LANGUAGES.has(body.language)) {
+        return c.json({ error: "Invalid language" }, 400);
+      }
       await db.sessions.updateLanguage(session.id, body.language);
       session.language = body.language;
     }
@@ -104,13 +106,11 @@ export const sessionRoutes = new Hono()
   })
 
   .get("/:id", async (c) => {
-    const user = c.get("user") as AuthUser | null;
+    const user = c.get("user");
     const session = await db.sessions.get(c.req.param("id"));
     if (!session) return c.json({ error: "Session not found" }, 404);
-    // Allow access only to owner or guest sessions
-    if (session.candidateId !== "guest" && user?.id !== session.candidateId) {
-      return c.json({ error: "Forbidden" }, 403);
-    }
+    const isOwner = session.candidateId === "guest" || user?.id === session.candidateId;
+    if (!isOwner) return c.json({ error: "Forbidden" }, 403);
     // Merge templates from in-memory (DB doesn't store templates)
     const inMemoryQ = questions.getById(session.question.id);
     if (inMemoryQ?.templates) {
@@ -120,11 +120,16 @@ export const sessionRoutes = new Hono()
   })
 
   .post("/:id/retry-evaluation", async (c) => {
-    const user = c.get("user") as AuthUser | null;
+    const user = c.get("user");
     const session = await db.sessions.get(c.req.param("id"));
     if (!session) return c.json({ error: "Session not found" }, 404);
-    if (session.candidateId !== "guest" && user?.id !== session.candidateId) {
-      return c.json({ error: "Forbidden" }, 403);
+    const isOwner = session.candidateId === "guest" || user?.id === session.candidateId;
+    if (!isOwner) return c.json({ error: "Forbidden" }, 403);
+
+    // Per-session retry rate limit (max 3 retries per session)
+    const retryCount = retryUsage.get(session.id) ?? 0;
+    if (retryCount >= 3) {
+      return c.json({ error: "Retry limit reached for this session." }, 429);
     }
 
     const answer = await db.answers.findBySessionId(session.id);
@@ -135,6 +140,7 @@ export const sessionRoutes = new Hono()
       return c.json({ ok: true, answer, evaluation: existing, reused: true });
     }
 
+    retryUsage.set(session.id, retryCount + 1);
     const question = questions.getById(session.question.id);
     const evaluation = await evaluate(answer, question);
     return c.json({ ok: true, answer, evaluation, retried: true });

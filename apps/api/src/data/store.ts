@@ -156,7 +156,7 @@ export const db = {
         .insert(sessionsTable)
         .values({
           id: s.id,
-          userId: (s.candidateId === "local-test-user" || s.candidateId === "guest") ? null : s.candidateId,
+          userId: s.candidateId === "guest" ? null : s.candidateId,
           questionId: s.question.id,
           language: s.language,
           status: s.status,
@@ -168,15 +168,10 @@ export const db = {
       const [row] = await getPgDb()
         .select()
         .from(sessionsTable)
+        .innerJoin(questionsTable, eq(sessionsTable.questionId, questionsTable.id))
         .where(eq(sessionsTable.id, id));
       if (!row) return undefined;
-      // Need to fetch the question from questions table
-      const [qRow] = await getPgDb()
-        .select()
-        .from(questionsTable)
-        .where(eq(questionsTable.id, row.questionId));
-      if (!qRow) return undefined;
-      return toSession(row, toQuestion(qRow));
+      return toSession(row.sessions, toQuestion(row.questions));
     },
     async list(limit = 100): Promise<Session[]> {
       const rows = await getPgDb()

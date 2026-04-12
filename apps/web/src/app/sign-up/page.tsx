@@ -35,7 +35,7 @@ export default function SignUpPage() {
   }
 
   async function handleGoogleSignIn() {
-    await signIn.social({ provider: "google", callbackURL: `${window.location.origin}/practice` });
+    await signIn.social({ provider: "google", callbackURL: "/practice" });
   }
 
   return (
