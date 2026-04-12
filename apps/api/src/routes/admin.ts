@@ -3,6 +3,7 @@ import { eq } from "drizzle-orm";
 import { getPgDb } from "../db/index.js";
 import { questions as questionsTable } from "../db/schema.js";
 import { requireAuth, type AuthUser } from "../middleware/auth.js";
+import { generateRubric } from "../services/rubric-generator.js";
 
 // Admin emails — in production, use a role-based system
 const ADMIN_EMAILS = (process.env.ADMIN_EMAILS ?? "").split(",").map((e) => e.trim()).filter(Boolean);
@@ -37,7 +38,70 @@ export const adminRoutes = new Hono()
     return c.json({ ok: true, question: row });
   })
 
-  // Create question
+  // Generate rubric (preview — does not save)
+  .post("/questions/generate-rubric", async (c) => {
+    const body = await c.req.json<{
+      category: string;
+      type: string;
+      title: string;
+      prompt: string;
+      diff?: string;
+      language?: string;
+    }>();
+
+    const errors: string[] = [];
+    if (!body.category) errors.push("category is required");
+    if (!body.type) errors.push("type is required");
+    if (!body.title) errors.push("title is required");
+    if (!body.prompt) errors.push("prompt is required");
+    if (errors.length > 0) return c.json({ error: { code: "invalid_input", details: errors } }, 400);
+
+    try {
+      const rubric = await generateRubric(body);
+      return c.json({ ok: true, rubric });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Unknown error";
+      return c.json({ error: `Rubric generation failed: ${msg}` }, 500);
+    }
+  })
+
+  // Regenerate rubric for an existing question
+  .post("/questions/:id/generate-rubric", async (c) => {
+    const id = c.req.param("id");
+    const [existing] = await getPgDb()
+      .select()
+      .from(questionsTable)
+      .where(eq(questionsTable.id, id));
+    if (!existing) return c.json({ error: "Question not found" }, 404);
+
+    const body = await c.req.json<{ save?: boolean }>().catch(() => ({}));
+    const shouldSave = (body as { save?: boolean }).save === true;
+
+    try {
+      const rubric = await generateRubric({
+        category: existing.category,
+        type: existing.type,
+        title: existing.title,
+        prompt: existing.prompt,
+        diff: existing.diff,
+        language: existing.language ?? undefined,
+      });
+
+      if (shouldSave) {
+        await getPgDb()
+          .update(questionsTable)
+          .set({ rubric })
+          .where(eq(questionsTable.id, id));
+      }
+
+      return c.json({ ok: true, rubric, saved: shouldSave });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Unknown error";
+      return c.json({ error: `Rubric generation failed: ${msg}` }, 500);
+    }
+  })
+
+  // Create question (auto-generates rubric if not provided)
   .post("/questions", async (c) => {
     const body = await c.req.json<{
       id?: string;
@@ -49,7 +113,7 @@ export const adminRoutes = new Hono()
       diff: string;
       difficulty?: string;
       tags?: string[];
-      rubric: {
+      rubric?: {
         mustCover: string[];
         strongSignals: string[];
         weakPatterns: string[];
@@ -62,8 +126,27 @@ export const adminRoutes = new Hono()
     if (!body.type) errors.push("type is required");
     if (!body.title) errors.push("title is required");
     if (!body.prompt) errors.push("prompt is required");
-    if (!body.rubric?.mustCover?.length) errors.push("rubric.mustCover must have at least one item");
     if (errors.length > 0) return c.json({ error: { code: "invalid_input", details: errors } }, 400);
+
+    // Auto-generate rubric if not provided
+    let rubric = body.rubric;
+    let rubricGenerated = false;
+    if (!rubric?.mustCover?.length) {
+      try {
+        rubric = await generateRubric({
+          category: body.category,
+          type: body.type,
+          title: body.title,
+          prompt: body.prompt,
+          diff: body.diff,
+          language: body.language,
+        });
+        rubricGenerated = true;
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : "Unknown error";
+        return c.json({ error: `Auto rubric generation failed: ${msg}` }, 500);
+      }
+    }
 
     const id = body.id ?? crypto.randomUUID();
 
@@ -79,11 +162,11 @@ export const adminRoutes = new Hono()
         diff: body.diff ?? "",
         difficulty: body.difficulty ?? "medium",
         tags: body.tags ?? [],
-        rubric: body.rubric,
+        rubric,
       })
       .returning();
 
-    return c.json({ ok: true, question: row }, 201);
+    return c.json({ ok: true, question: row, rubricGenerated }, 201);
   })
 
   // Update question

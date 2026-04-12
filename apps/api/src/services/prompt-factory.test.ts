@@ -13,7 +13,6 @@ const makeQuestion = (overrides: Partial<Question> = {}): Question => ({
   id: "q1",
   category: "code_review",
   type: "security",
-  language: null,
   title: "SQL Injection Review",
   prompt: "Review the following code for security issues.",
   diff: "function getUser(id) { db.query(`SELECT * FROM users WHERE id = ${id}`); }",
