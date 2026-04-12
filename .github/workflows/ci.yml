@@ -1,0 +1,45 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install root deps
+        run: npm ci
+
+      - name: Install API deps
+        working-directory: apps/api
+        run: npm ci
+
+      - name: Install Web deps
+        working-directory: apps/web
+        run: npm ci
+
+      - name: Type-check API
+        working-directory: apps/api
+        run: npx tsc --noEmit
+
+      - name: Type-check Web
+        working-directory: apps/web
+        run: npx tsc --noEmit
+
+      - name: Lint Web
+        working-directory: apps/web
+        run: npm run lint
+
+      - name: Test API
+        working-directory: apps/api
+        run: npm test
