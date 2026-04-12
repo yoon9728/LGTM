@@ -4,6 +4,8 @@ import { getPgDb } from "../db/index.js";
 import { questions as questionsTable } from "../db/schema.js";
 import { requireAuth, type AuthUser } from "../middleware/auth.js";
 import { generateRubric } from "../services/rubric-generator.js";
+import { invalidate as invalidateRubricCache, warmUp as warmUpRubricCache } from "../services/rubric-store.js";
+import type { Question } from "../data/questions.js";
 
 // Admin emails — in production, use a role-based system
 const ADMIN_EMAILS = (process.env.ADMIN_EMAILS ?? "").split(",").map((e) => e.trim()).filter(Boolean);
@@ -211,13 +213,44 @@ export const adminRoutes = new Hono()
       return c.json({ error: "No fields to update" }, 400);
     }
 
+    // If content fields changed, auto-regenerate rubric
+    const contentChanged = body.prompt !== undefined || body.diff !== undefined || body.title !== undefined;
+    let rubricRegenerated = false;
+
+    if (contentChanged && !body.rubric) {
+      try {
+        const merged = { ...existing, ...updates };
+        const rubric = await generateRubric({
+          category: merged.category as string,
+          type: merged.type as string,
+          title: merged.title as string,
+          prompt: merged.prompt as string,
+          diff: (merged.diff as string) || undefined,
+          language: (merged.language as string) ?? undefined,
+        });
+        updates.rubric = rubric;
+        rubricRegenerated = true;
+      } catch (err) {
+        console.error("Auto rubric regeneration failed:", err);
+        // Continue without rubric update — don't block the question update
+      }
+    }
+
     const [row] = await getPgDb()
       .update(questionsTable)
       .set(updates)
       .where(eq(questionsTable.id, id))
       .returning();
 
-    return c.json({ ok: true, question: row });
+    // Invalidate in-memory rubric cache so next evaluation uses fresh rubric
+    invalidateRubricCache(id);
+
+    // If it's an in-memory question, warm up the cache with the new content
+    if (rubricRegenerated && row) {
+      warmUpRubricCache(row as unknown as Question).catch(() => {});
+    }
+
+    return c.json({ ok: true, question: row, rubricRegenerated });
   })
 
   // Delete question
@@ -230,5 +263,6 @@ export const adminRoutes = new Hono()
     if (!existing) return c.json({ error: "Question not found" }, 404);
 
     await getPgDb().delete(questionsTable).where(eq(questionsTable.id, id));
+    invalidateRubricCache(id);
     return c.json({ ok: true, deleted: id });
   });

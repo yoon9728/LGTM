@@ -186,6 +186,57 @@ ${rubric.strongSignals.map((s) => `- ${s}`).join("\n")}
 ### Weak Patterns (indicators of shallow analysis)
 ${rubric.weakPatterns.map((w) => `- ${w}`).join("\n")}
 
+## Coverage Judgment Guide
+The mustCover criteria are ordered by difficulty (items 1-2 are fundamental, 3-4 intermediate, 5 advanced).
+
+When judging each criterion, use this decision tree:
+
+**"covered"**: The answer addresses this criterion with SPECIFICITY — names the exact location, mechanism, or detail.
+  Example: criterion is about SQL injection → answer says "the q parameter in the ILIKE clause is interpolated, allowing injection" = covered
+
+**"partial"**: The answer demonstrates AWARENESS of the topic area, even if vague or incomplete. ANY of these count as partial:
+  - Mentions the right category of issue ("security issue", "null check needed", "missing index") → partial
+  - Gets the general direction right but wrong on specifics → partial
+  - Addresses one of several aspects covered by the criterion → partial
+  - Uses alternative terminology for the same concept → partial
+  - Proposes a fix that implies understanding of the issue without explicitly stating it → partial
+
+**"missing"**: The answer makes NO mention of this topic area whatsoever. The candidate shows zero awareness of this dimension.
+
+**Decision rule: "missing" should be RARE.** If the candidate wrote more than 2 sentences and the topic is related to the problem at hand, at least one criterion should likely get "partial". Only use "missing" when the answer truly does not touch this dimension at all.
+
+## Scoring Guide
+
+**STEP 1: Classify the answer's quality level FIRST, then assign a score within that range.**
+
+| Level | Description | Score Range |
+|-------|-------------|-------------|
+| **Irrelevant** | Does not engage with the problem, completely wrong domain | 0-10 |
+| **Beginner** | Recognizes the problem area, mentions relevant concepts but vague or generic. Shows AWARENESS without SPECIFICITY. | 20-35 |
+| **Competent** | Identifies the main issue(s) with specificity, reasonable approach, demonstrates real understanding. | 40-60 |
+| **Strong** | Thorough answer covering most criteria with depth, good reasoning, considers edge cases. | 65-85 |
+| **Expert** | Comprehensive: all criteria covered with depth, strongSignals present, excellent reasoning. | 85-100 |
+
+**STEP 2: Use mustCover results to refine within the range.**
+
+Count your coverage results:
+- If answer has 2+ "partial" and 0 "covered" → Beginner level (20-35)
+- If answer has 1+ "covered" and 2+ "partial" → Competent level (40-60)
+- If answer has 3+ "covered" → Strong level (65-85)
+- If answer has 4+ "covered" + strongSignals → Expert level (85-100)
+
+**STEP 3: Adjust for quality factors (within the level range).**
+- Reasoning clarity and structure → move up/down within range
+- Actionable recommendations → move up within range
+- weakPatterns present → move toward lower end of range, or drop one level if severe
+- strongSignals present → move toward upper end of range
+
+**CRITICAL RULES:**
+1. An answer that says "there's a security issue" or "the query is slow because of subqueries" — even without specifics — is AT LEAST Beginner level (score ≥ 20).
+2. An answer that names the correct problem type AND proposes a reasonable general fix is AT LEAST score 30.
+3. Never score below 15 if the answer is on-topic and shows any understanding of the problem domain.
+4. The levels above are HARD BOUNDARIES — do not assign a score outside the identified level's range.
+
 ## Response Format
 Return strict JSON with these keys:
 - evaluable: boolean (true if the answer can be meaningfully scored)

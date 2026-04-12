@@ -1,11 +1,9 @@
 import { Hono } from "hono";
-import { eq } from "drizzle-orm";
 import { db, type Answer } from "../data/store.js";
 import * as questions from "../data/questions.js";
 import { evaluate } from "../services/evaluation.js";
 import { optionalAuth } from "../middleware/auth.js";
-import { getPgDb } from "../db/index.js";
-import { questions as questionsTable } from "../db/schema.js";
+import { getRubric } from "../services/rubric-store.js";
 
 export const answerRoutes = new Hono()
   .use("*", optionalAuth)
@@ -157,17 +155,11 @@ export const answerRoutes = new Hono()
 
     if (body.sessionId) await db.sessions.updateStatus(body.sessionId, "answer_submitted");
 
-    // Prefer DB question (has AI-generated rubric) over in-memory fallback
+    // Get question and resolve rubric (cached AI-generated, or generates on first use)
     let question = questions.getById(answer.questionId);
-    const [dbQuestion] = await getPgDb()
-      .select()
-      .from(questionsTable)
-      .where(eq(questionsTable.id, answer.questionId));
-    if (dbQuestion?.rubric) {
-      question = {
-        ...question!,
-        rubric: dbQuestion.rubric as { mustCover: string[]; strongSignals: string[]; weakPatterns: string[] },
-      };
+    if (question) {
+      const rubric = await getRubric(question);
+      question = { ...question, rubric };
     }
 
     // Use session-level language (user's choice) over question-level language

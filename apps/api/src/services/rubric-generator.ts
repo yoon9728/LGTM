@@ -8,53 +8,57 @@
 
 const CATEGORY_LENSES: Record<string, string> = {
   code_review: `### Analysis Lens: Code Review
-Focus on these dimensions when extracting rubric criteria:
-- **Security vulnerabilities**: injection (SQL, XSS, command), auth bypass, token/secret exposure, SSRF, path traversal
-- **Data integrity**: race conditions, lost updates, inconsistent state, transaction boundaries
-- **Error handling**: silent catches, error info leakage, missing validation, unchecked nulls
-- **Performance**: N+1 queries, unbounded fetches, missing indexes, memory leaks, blocking I/O
-- **API contract changes**: response shape changes, breaking changes, unintended field exposure
-- **Concurrency**: thread safety, deadlocks, TOCTOU, shared mutable state
-- **Testing gaps**: what edge cases need test coverage after this change`,
+Build criteria around these GRADUATED dimensions (fundamental → advanced):
+1. FUNDAMENTAL: Does the candidate recognize the CLASS of security/correctness issue? (e.g., "identifies injection risk" — partial if vague, covered if specific)
+2. FUNDAMENTAL: Does the candidate understand the REGRESSION — what was safe before and what broke? (e.g., "recognizes that parameterized queries were removed")
+3. INTERMEDIATE: Can the candidate identify ALL vulnerable entry points, not just the most obvious one?
+4. INTERMEDIATE: Does the candidate explain the IMPACT — what an attacker could actually do?
+5. ADVANCED: Does the candidate notice secondary issues beyond the main vulnerability? (API contract changes, performance, missing validations)
+
+IMPORTANT: If the same vulnerability type appears in multiple parameters, make it ONE criterion that tests whether the candidate finds all of them (partial = finds one, covered = finds all).`,
 
   system_design: `### Analysis Lens: System Design
-Focus on these dimensions when extracting rubric criteria:
-- **Core component selection**: why this database/queue/cache/protocol — justify choices
-- **Scalability**: identify bottlenecks, horizontal vs vertical, sharding strategy, read/write ratio
-- **Reliability**: single points of failure, failover, circuit breakers, graceful degradation
-- **Data model**: consistency model (strong/eventual), partitioning strategy, replication lag handling
-- **Trade-offs**: CAP theorem positioning, latency vs throughput, cost vs performance
-- **Operational concerns**: monitoring, alerting, deployment strategy, rollback plan
-- **Security boundary**: auth flow, data isolation, encryption at rest/transit`,
+Build criteria around these GRADUATED dimensions (fundamental → advanced):
+1. FUNDAMENTAL: Does the candidate propose a reasonable high-level architecture with appropriate components? (partial = lists components, covered = explains why each component)
+2. FUNDAMENTAL: Does the candidate address the data model and storage strategy?
+3. INTERMEDIATE: Does the candidate design for the specific scale requirements stated in the problem (reads/sec, writes/sec, latency)?
+4. INTERMEDIATE: Does the candidate discuss trade-offs between their choices and alternatives?
+5. ADVANCED: Does the candidate address operational concerns (failure modes, monitoring, scaling strategy over time)?`,
 
   debugging: `### Analysis Lens: Debugging
-Focus on these dimensions when extracting rubric criteria:
-- **Root cause precision**: exact line/condition/state that triggers the bug, not symptoms
-- **Evidence chain**: what observations (logs, stack traces, repro steps) lead to the conclusion
-- **Reproduction conditions**: when does it happen — always, under load, race condition, specific input
-- **Fix correctness**: does the proposed fix actually resolve the root cause without side effects
-- **Regression prevention**: what test would catch this if it reappeared
-- **Blast radius**: what else could break from the same underlying issue
-- **Similar pattern detection**: are there other code paths with the same vulnerability`,
+Build criteria around these GRADUATED dimensions (fundamental → advanced):
+1. FUNDAMENTAL: Does the candidate identify the correct root cause — which expression fails and why? (partial = right area, covered = exact expression)
+2. FUNDAMENTAL: Does the candidate propose a fix that actually resolves the issue?
+3. INTERMEDIATE: Does the candidate explain WHY the bug is intermittent / occurs under specific conditions?
+4. INTERMEDIATE: Does the candidate consider the broader impact — other code paths with the same vulnerability?
+5. ADVANCED: Does the candidate suggest regression prevention (tests, monitoring, architectural fixes)?
+
+IMPORTANT: "What is the bug" and "where is the bug" are the SAME dimension — do not split them.`,
 
   data_analysis: `### Analysis Lens: Data Analysis
-Focus on these dimensions when extracting rubric criteria:
-- **Query correctness**: does the query actually answer the question asked, JOIN logic, GROUP BY semantics
-- **Edge cases**: NULL handling, empty result sets, duplicates, division by zero, date boundaries
-- **Performance**: index utilization, avoid full scans, appropriate use of CTEs vs subqueries
-- **Data interpretation**: does the candidate correctly interpret what the results mean
-- **Optimization awareness**: EXPLAIN plan thinking, materialized views, partitioning for large tables
-- **Business context**: does the analysis connect technical results to business implications`,
+Build criteria around these GRADUATED dimensions (fundamental → advanced):
+1. FUNDAMENTAL: Does the query use the correct tables and joins to answer the question? (partial = right tables, covered = correct join logic)
+2. FUNDAMENTAL: Does the query produce the requested output columns with correct aggregation?
+3. INTERMEDIATE: Does the query handle data filtering correctly (status filters, date ranges, exclusions)?
+4. INTERMEDIATE: Does the candidate explain their approach clearly and correctly?
+5. ADVANCED: Does the candidate discuss optimization (indexes, query plan, materialization)?
+
+IMPORTANT for data_analysis:
+- Criterion 5 (optimization) should give "covered" for discussing indexes and query plans. Do NOT require materialized views or exotic optimization for "covered" — those are strongSignals.
+- A comprehensive answer covering criteria 1-5 with depth should be able to score 85+. Do not design rubrics where even a perfect answer can only reach ~75.`,
 
   practical_coding: `### Analysis Lens: Practical Coding
-Focus on these dimensions when extracting rubric criteria:
-- **Correctness**: does the code produce correct output for all valid inputs
-- **Algorithm choice**: is the approach appropriate for the problem constraints (time/space)
-- **Edge cases**: empty input, single element, boundary values, integer overflow, unicode
-- **Code quality**: naming, structure, readability — would you approve this in code review
-- **Complexity analysis**: is the stated complexity actually correct and well-justified
-- **Testing mindset**: does the candidate reason about what inputs would break their solution
-- **Trade-offs**: if multiple approaches exist, does the candidate acknowledge alternatives`,
+Build criteria around these GRADUATED dimensions (fundamental → advanced):
+1. FUNDAMENTAL: Does the code correctly implement the core operations described in the problem? (partial = code runs and handles the basic case even with bugs, covered = all core operations work correctly)
+2. FUNDAMENTAL: Does the candidate explain their approach and demonstrate understanding of what the problem requires? (partial = describes the general idea, covered = explains why this approach works)
+3. INTERMEDIATE: Does the implementation handle edge cases (empty input, capacity limits, duplicate keys, boundary conditions)?
+4. INTERMEDIATE: Is the complexity analysis correct and does the implementation meet the stated time complexity requirement? (partial = mentions complexity, covered = correct analysis with justification)
+5. ADVANCED: Does the candidate discuss design choices, trade-offs, or why they rejected alternative approaches?
+
+IMPORTANT for practical_coding:
+- A correct implementation that is O(n) instead of O(1) should still earn "covered" on criterion 1 (correctness) and "partial" on criterion 4 (complexity). Do NOT penalize correctness for suboptimal complexity.
+- Multiple valid implementations exist. Frame criteria as behavioral requirements (e.g., "handles eviction correctly") not specific implementations (e.g., "uses doubly linked list").
+- Criterion 2 is about EXPLANATION quality, not code quality. A working solution with a brief explanation = partial. A working solution with clear reasoning = covered.`,
 };
 
 const DEFAULT_LENS = `### Analysis Lens: General
@@ -67,38 +71,62 @@ function buildRubricSystemPrompt(category: string): string {
 
   return `You are an expert technical interview rubric designer with 10+ years of engineering and interviewing experience.
 
-Your job: analyze the given problem and produce a precise, fair grading rubric.
+Your job: analyze the given problem and produce a precise, fair grading rubric that accurately differentiates beginner through expert-level answers.
 
 ## Rubric Structure
 
-### mustCover (3–5 items)
-These are the critical points that ANY competent answer MUST address.
+### mustCover (EXACTLY 5 items — no fewer, no more)
+These criteria evaluate the candidate's understanding at different depth levels.
 
-Rules:
-- Each item must be **specific and verifiable** from the problem content
-  BAD:  "Security is important"
-  GOOD: "User input 'q' is interpolated directly into the SQL string via template literal, creating a SQL injection vulnerability that allows arbitrary query manipulation."
+**CRITICAL: Write criteria as graduated understanding checks, NOT as "find specific detail X" checks.**
+
+Each criterion MUST be achievable at TWO levels:
+- **"partial"** = The candidate shows AWARENESS of this topic area (mentions the category, general direction, or related concept). A vague, one-sentence mention is enough for partial.
+- **"covered"** = The candidate demonstrates SPECIFIC understanding (names exact locations, mechanisms, or provides detailed explanation).
+
+**The partial threshold must be LOW.** A candidate who writes "there's a security issue with user input" should get partial on a SQL injection criterion. A candidate who writes "the queries are slow" should get partial on a performance criterion.
+
+BAD criterion (too specific, binary pass/fail):
+  "The raw q parameter is interpolated into the SQL ILIKE clause via template literal"
+  → Either you mention "q" and "ILIKE" or you don't. No room for partial credit.
+
+GOOD criterion (graduated, tests understanding):
+  "Identifies SQL injection caused by string interpolation of unsanitized user input into the query, and can point to the specific vulnerable parameters"
+  → Partial: "there's a SQL injection risk" or "string interpolation in SQL is dangerous" (correct category, vague on details)
+  → Covered: "the q parameter in the ILIKE and limit in the LIMIT clause are both interpolated" (specific)
+
+MORE GOOD EXAMPLES:
+  "Recognizes that the original code had safety mechanisms (e.g., parameterized queries) that were removed in this change"
+  → Partial: "should use prepared statements" (knows the fix direction)
+  → Covered: "the original used $1/$2 parameterized queries which were safe; this change removes that protection" (specific regression)
+
+  "Proposes an appropriate data structure or algorithm that achieves the required time complexity"
+  → Partial: "need a way to track order and do fast lookups" (understands the requirements)
+  → Covered: "hash map + doubly linked list gives O(1) for both operations" (specific solution)
+
+**Difficulty distribution (MANDATORY):**
+1. Item 1-2: FUNDAMENTAL — these must be VERY easy to get "partial" on. A single sentence mentioning the right problem area = partial. Example: "there's a security issue" should earn partial on a security criterion. A junior/mid developer who understands what category of problem this is should get partial. Specificity earns "covered".
+2. Item 3-4: INTERMEDIATE — require more specific analysis. Test whether the candidate identifies specific details, root causes, or important secondary issues. Even here, a vague mention of the right topic = partial.
+3. Item 5: ADVANCED — requires expert-level insight. Test whether the candidate sees non-obvious implications, edge cases, or systemic concerns. Only strong answers get partial here.
+
+**Other rules:**
 - Derive items directly from the diff/code/scenario — no generic filler
-- Order by severity: most critical issue first
-- Each item must be independently evaluable (don't combine two issues into one)
-- Write as factual statements about what the problem contains, not as instructions
+- Each item must be independently evaluable (one concept per item)
+- **NO OVERLAP**: Each criterion must test a DISTINCT dimension. If two criteria would always be covered/missed together, merge them.
 
 ### strongSignals (2–4 items)
-These distinguish top-10% answers from merely adequate ones.
-
-Rules:
-- One level deeper than mustCover — shows genuine expertise
-- Examples: specific exploit payloads, alternative architecture with trade-off analysis, downstream impact analysis, production war story parallels
-- Should NOT overlap with mustCover — these are bonus depth indicators
+These distinguish top-10% answers. One level deeper than mustCover.
+- Specific exploit payloads / attack scenarios
+- Alternative approaches with trade-off analysis
+- Downstream impact analysis
+- Production-readiness considerations
+- Should NOT overlap with mustCover
 
 ### weakPatterns (2–3 items)
-Common patterns seen in shallow or poor answers.
-
-Rules:
-- Observable behaviors, not just "didn't do X"
-  BAD:  "Didn't mention security"
-  GOOD: "Mentions SQL injection as a general concept without identifying the specific vulnerable code path in this diff"
-- Include patterns like: surface-level observation without root cause, finding only one issue when multiple critical ones exist, copy-paste generic advice without connecting to the specific code
+Observable behaviors in shallow answers.
+- Must be concrete behaviors, not just "didn't do X"
+  GOOD: "Mentions the problem category in general terms without connecting it to the specific code shown"
+- Examples: surface-level observation without root cause, generic textbook advice, finding only the most obvious issue
 
 ${lens}
 
@@ -106,12 +134,12 @@ ${lens}
 - Multiple valid approaches exist. The rubric defines what MUST be covered, not the ONE correct answer.
 - Base everything on the actual code/diff/scenario — never invent issues that aren't present.
 - Write all rubric items in English.
-- Each mustCover item should be a single, clear sentence.
+- Test UNDERSTANDING and REASONING, not keyword matching.
 
 ## Output Format
 Return strict JSON (no markdown, no comments):
 {
-  "mustCover": ["...", "..."],
+  "mustCover": ["...", "...", "...", "...", "..."],
   "strongSignals": ["...", "..."],
   "weakPatterns": ["...", "..."]
 }`;
@@ -160,7 +188,7 @@ export interface Rubric {
 
 export async function generateRubric(input: RubricInput): Promise<Rubric> {
   const apiKey = process.env.OPENAI_API_KEY ?? "";
-  const model = process.env.OPENAI_MODEL ?? "gpt-4.1-mini";
+  const model = process.env.OPENAI_MODEL ?? "gpt-5.4-mini";
 
   if (!apiKey) {
     throw new Error("OPENAI_API_KEY is not configured");
@@ -174,7 +202,7 @@ export async function generateRubric(input: RubricInput): Promise<Rubric> {
     },
     body: JSON.stringify({
       model,
-      temperature: 0.3, // Low temperature for consistent, precise rubrics
+      temperature: 0.2, // Low temperature for consistent, precise rubrics
       response_format: { type: "json_object" },
       messages: [
         { role: "system", content: buildRubricSystemPrompt(input.category) },

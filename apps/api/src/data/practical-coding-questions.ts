@@ -162,18 +162,18 @@ func (c *LRUCache) Put(key int, value int) {
     },
     rubric: {
       mustCover: [
-        "Uses a hash map for O(1) key lookup combined with a doubly-linked list for O(1) order maintenance.",
-        "Correctly evicts the least recently used (tail) node when capacity is exceeded, removing it from both the list and hash map.",
-        "On get(), moves the accessed node to the head (most recently used position). On put(), either updates existing and moves to head, or inserts new at head.",
+        "Uses a hash map (dictionary) for key lookup paired with a data structure that tracks access order (doubly-linked list, array, or similar).",
+        "Correctly evicts the least recently used entry when capacity is exceeded — removes it from both the lookup structure and the order-tracking structure.",
+        "On get(), marks the accessed key as most recently used. On put(), inserts new keys and updates existing keys, moving them to the most-recently-used position.",
       ],
       strongSignals: [
+        "Achieves O(1) for both get and put by using a doubly-linked list (not an array) for order tracking, with direct node references from the hash map.",
         "Uses sentinel/dummy head and tail nodes to eliminate null-check edge cases in list operations.",
-        "Extracts reusable helpers (addToHead, removeNode, moveToHead) for clean doubly-linked list manipulation.",
-        "Handles the update case in put() correctly: updates value AND moves to head, not just one or the other.",
+        "Handles the update case in put() correctly: updates the value AND moves to most-recently-used, not just one or the other.",
       ],
       weakPatterns: [
-        "Uses a built-in ordered dictionary or linked hash map (defeats the purpose of the exercise).",
-        "Implements O(n) linear scan to find LRU instead of O(1) doubly-linked list removal.",
+        "Uses a built-in ordered dictionary or linked hash map (e.g., Python's OrderedDict as the sole implementation — defeats the purpose of the exercise).",
+        "Does not handle the capacity constraint at all, or evicts the wrong entry (e.g., most recently used instead of least).",
       ],
     },
   },

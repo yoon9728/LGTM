@@ -759,14 +759,14 @@ async function getDashboard(req, res) {
 }`,
     rubric: {
       mustCover: [
-        "Promise.all fails fast on the first rejection but still resolves the others — if one service is slow/failing, the others may resolve with undefined or partial data.",
-        "orders.items and recommendations.products assume the response shape is always correct. If either service returns null, {}, or an error response, .map crashes.",
-        "The 2% failure rate during peak hours suggests timeout or service degradation — one of the downstream services intermittently returns an unexpected shape.",
+        "The .map() crash occurs because orders.items or recommendations.products is undefined — the code assumes a fixed response shape without defensive checks.",
+        "The root cause is that one of the downstream services (fetchRecentOrders or fetchRecommendations) intermittently returns null, an empty object, or an error wrapper instead of the expected { items: [...] } or { products: [...] } shape.",
+        "The 2% failure rate during peak hours points to service degradation or timeout — under load, a downstream service responds with an unexpected shape (e.g., timeout error, partial response, or empty body parsed as {}).",
       ],
       strongSignals: [
-        "Recommends Promise.allSettled instead of Promise.all to handle partial failures gracefully.",
-        "Suggests defensive checks: orders?.items?.map() or validation of response shape before accessing nested properties.",
-        "Notes that the error could be in fetchRecentOrders returning { items: undefined } when the order service times out or returns an error wrapper.",
+        "Recommends Promise.allSettled instead of Promise.all so that one failing service does not block the dashboard entirely.",
+        "Suggests defensive checks like orders?.items?.map() or explicit response shape validation before accessing nested properties.",
+        "Identifies that the error line (dashboard.js:15) corresponds to orders.items.map, narrowing the failing service to fetchRecentOrders.",
       ],
       weakPatterns: [
         "Only says 'add null checks' without explaining why the data is null in the first place.",
