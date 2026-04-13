@@ -10,7 +10,10 @@ export function getAuth() {
     const googleId = process.env.GOOGLE_CLIENT_ID;
     const googleSecret = process.env.GOOGLE_CLIENT_SECRET;
 
+    const isProduction = process.env.NODE_ENV === "production";
+
     _auth = betterAuth({
+      baseURL: process.env.BETTER_AUTH_URL,
       database: drizzleAdapter(getPgDb(), {
         provider: "pg",
       }),
@@ -30,6 +33,17 @@ export function getAuth() {
       trustedOrigins: (process.env.WEB_ORIGIN ?? "http://localhost:4173")
         .split(",")
         .map((o) => o.trim()),
+      advanced: {
+        crossSubDomainCookies: {
+          enabled: false,
+        },
+        defaultCookieAttributes: isProduction
+          ? {
+              sameSite: "none",
+              secure: true,
+            }
+          : {},
+      },
     });
   }
   return _auth;
