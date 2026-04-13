@@ -217,22 +217,26 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* Gradient divider */}
-      <div className="gradient-divider" />
-
-      {/* Problem types showcase */}
-      <section className="bg-card/30" ref={scenarioRef}>
-        <div className="max-w-6xl mx-auto px-6 py-20">
-          <p className="scroll-reveal text-xs font-mono font-medium tracking-widest uppercase text-muted-foreground mb-10">
-            Multi-domain scenarios
-          </p>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {scenarioCards.map((item) => (
+      {/* Problem types + How it works — combined denser section */}
+      <section className="bg-card/30 border-y border-border/30" ref={scenarioRef}>
+        <div className="max-w-6xl mx-auto px-6 py-16">
+          <div className="flex items-center justify-between mb-8">
+            <p className="scroll-reveal text-xs font-mono font-medium tracking-widest uppercase text-muted-foreground">
+              Multi-domain scenarios
+            </p>
+            <p className="scroll-reveal text-xs text-muted-foreground">
+              5 categories · 52 questions
+            </p>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            {scenarioCards.map((item, i) => (
               <div
                 key={item.label}
                 className="scroll-reveal card-glow group flex items-start gap-4 p-5 rounded-xl"
               >
-                <item.icon className="size-5 text-primary mt-0.5 shrink-0" />
+                <div className="size-9 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+                  <item.icon className="size-4 text-primary" />
+                </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
                     <p className="text-sm font-medium text-foreground">
@@ -260,23 +264,20 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* Gradient divider */}
-      <div className="gradient-divider" />
-
-      {/* How it works */}
+      {/* How it works — tighter layout */}
       <section ref={howRef}>
-        <div className="max-w-6xl mx-auto px-6 py-20">
-          <p className="scroll-reveal text-xs font-mono font-medium tracking-widest uppercase text-muted-foreground mb-10">
+        <div className="max-w-6xl mx-auto px-6 py-16">
+          <p className="scroll-reveal text-xs font-mono font-medium tracking-widest uppercase text-muted-foreground mb-8">
             How it works
           </p>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             {howItWorks.map((s) => (
               <div
                 key={s.step}
-                className="scroll-reveal card-glow group space-y-4 p-6 rounded-xl"
+                className="scroll-reveal card-glow group space-y-3 p-5 rounded-xl"
               >
                 <div className="flex items-center gap-3">
-                  <span className="text-xs font-mono font-bold text-primary">
+                  <span className="text-lg font-mono font-bold text-primary/60">
                     {s.step}
                   </span>
                   <s.icon className="size-4 text-muted-foreground group-hover:text-foreground transition-colors" />
@@ -293,13 +294,10 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* Gradient divider */}
-      <div className="gradient-divider" />
-
-      {/* What you practice */}
-      <section className="bg-card/30" ref={skillsRef}>
-        <div className="max-w-6xl mx-auto px-6 py-20">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-16">
+      {/* What you practice + Evaluation preview — combined */}
+      <section className="bg-card/30 border-y border-border/30" ref={skillsRef}>
+        <div className="max-w-6xl mx-auto px-6 py-16">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
             <div className="space-y-6 scroll-reveal">
               <p className="text-xs font-mono font-medium tracking-widest uppercase text-muted-foreground">
                 What you build
@@ -314,7 +312,7 @@ export default function LandingPage() {
                 identify what matters, and explain why — across any domain.
               </p>
             </div>
-            <div className="space-y-4">
+            <div className="space-y-3">
               {skills.map((item) => (
                 <div
                   key={item.label}
@@ -336,13 +334,10 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* Gradient divider */}
-      <div className="gradient-divider" />
-
       {/* Evaluation preview */}
       <section ref={evalRef}>
-        <div className="max-w-6xl mx-auto px-6 py-20">
-          <div className="text-center space-y-4 mb-12 scroll-reveal">
+        <div className="max-w-6xl mx-auto px-6 py-16">
+          <div className="text-center space-y-4 mb-10 scroll-reveal">
             <p className="text-xs font-mono font-medium tracking-widest uppercase text-muted-foreground">
               Not just a score
             </p>
@@ -408,12 +403,9 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* Gradient divider */}
-      <div className="gradient-divider" />
-
       {/* CTA */}
-      <section className="bg-card/30">
-        <div className="max-w-6xl mx-auto px-6 py-20 text-center space-y-6">
+      <section className="bg-card/30 border-t border-border/30">
+        <div className="max-w-6xl mx-auto px-6 py-16 text-center space-y-6">
           <h2 className="text-3xl sm:text-4xl font-bold tracking-tight">
             Ready to practice?
           </h2>

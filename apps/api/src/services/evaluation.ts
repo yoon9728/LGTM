@@ -4,8 +4,12 @@ import { buildSystemPrompt, buildUserMessage, getCategoryLabel } from "./prompt-
 
 function normalizeScore(score: unknown): number | null {
   if (typeof score !== "number" || Number.isNaN(score)) return null;
-  if (score >= 0 && score <= 1) return Math.round(score * 100);
-  return Math.max(0, Math.min(100, Math.round(score)));
+  let s = score;
+  if (s >= 0 && s <= 1) s = Math.round(s * 100);
+  s = Math.max(0, Math.min(100, Math.round(s)));
+  // Round 95+ to 100 — near-perfect answers should not be penalized for minor nitpicks
+  if (s >= 95) s = 100;
+  return s;
 }
 
 function normalizeArray(value: unknown): string[] {
@@ -53,6 +57,7 @@ async function callOpenAI(answer: Answer, question?: Question): Promise<Record<s
     },
     body: JSON.stringify({
       model,
+      temperature: 0.1,
       response_format: { type: "json_object" },
       messages: [
         {

@@ -35,11 +35,21 @@ const CATEGORY_META: Record<string, { label: string; icon: React.ReactNode }> = 
   practical_coding: { label: "Coding", icon: <PencilLineIcon className="size-3.5" /> },
 };
 
+const FILTER_OPTIONS = [
+  { id: "all", label: "All" },
+  { id: "code_review", label: "Review" },
+  { id: "system_design", label: "Design" },
+  { id: "debugging", label: "Debug" },
+  { id: "data_analysis", label: "Data" },
+  { id: "practical_coding", label: "Coding" },
+] as const;
+
 export default function HistoryPage() {
   const { data: authSession, isPending } = useSession();
   const router = useRouter();
   const [history, setHistory] = useState<HistoryEntry[]>([]);
   const [loading, setLoading] = useState(true);
+  const [filter, setFilter] = useState<string>("all");
 
   useEffect(() => {
     if (isPending) return;
@@ -70,6 +80,10 @@ export default function HistoryPage() {
             completedSessions.length
         )
       : null;
+
+  const filteredHistory = filter === "all"
+    ? history
+    : history.filter((h) => h.questionCategory === filter);
 
   return (
     <div className="max-w-4xl mx-auto px-6 pb-24">
@@ -119,16 +133,48 @@ export default function HistoryPage() {
         </div>
       </div>
 
+      {/* Category Filter */}
+      {history.length > 0 && (
+        <div className="flex flex-wrap gap-1.5 mb-6">
+          {FILTER_OPTIONS.map((opt) => {
+            const count = opt.id === "all"
+              ? history.length
+              : history.filter((h) => h.questionCategory === opt.id).length;
+            return (
+              <button
+                key={opt.id}
+                type="button"
+                onClick={() => setFilter(opt.id)}
+                className={`text-xs font-medium px-3 py-1.5 rounded-full border transition-colors ${
+                  filter === opt.id
+                    ? "bg-primary text-primary-foreground border-primary"
+                    : "bg-transparent text-muted-foreground border-border hover:border-foreground/20 hover:text-foreground"
+                }`}
+              >
+                {opt.label}
+                <span className="ml-1.5 text-[10px] opacity-70">{count}</span>
+              </button>
+            );
+          })}
+        </div>
+      )}
+
       {/* History List */}
       {loading ? (
         <div className="flex justify-center py-12">
           <Loader2Icon className="size-6 animate-spin text-muted-foreground" />
         </div>
-      ) : history.length === 0 ? (
-        <div className="text-center py-16 space-y-4">
-          <p className="text-muted-foreground">No sessions yet.</p>
+      ) : filteredHistory.length === 0 && filter === "all" ? (
+        <div className="text-center py-20 space-y-4">
+          <div className="size-16 rounded-full bg-muted/50 flex items-center justify-center mx-auto">
+            <CodeIcon className="size-7 text-muted-foreground/40" />
+          </div>
+          <div>
+            <p className="text-base font-medium text-foreground">No sessions yet</p>
+            <p className="text-sm text-muted-foreground mt-1">Start a practice session to build your history</p>
+          </div>
           <Link href="/practice">
-            <Button>
+            <Button className="mt-2">
               Start practicing
               <ArrowRightIcon className="size-3.5 ml-1.5" />
             </Button>
@@ -136,7 +182,12 @@ export default function HistoryPage() {
         </div>
       ) : (
         <div className="space-y-2">
-          {history.map((entry) => {
+          {filteredHistory.length === 0 && filter !== "all" ? (
+            <p className="text-sm text-muted-foreground text-center py-8">
+              No sessions in this category yet.
+            </p>
+          ) : null}
+          {filteredHistory.map((entry) => {
             const catMeta = CATEGORY_META[entry.questionCategory] ?? CATEGORY_META.code_review;
             return (
               <div

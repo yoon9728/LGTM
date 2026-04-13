@@ -229,12 +229,13 @@
 }
 
 :root:not(.dark) .card-glow {
-  background: oklch(0.96 0 0 / 0.7);
-  border-color: oklch(0.88 0 0 / 0.8);
+  background: oklch(0.99 0 0 / 0.9);
+  border-color: oklch(0.85 0 0);
+  box-shadow: 0 1px 3px oklch(0 0 0 / 0.06);
 }
 :root:not(.dark) .card-glow:hover {
   border-color: oklch(0.5 0.14 270 / 0.5);
-  box-shadow: 0 0 24px oklch(0.5 0.15 270 / 0.1), 0 0 48px oklch(0.5 0.12 200 / 0.05);
+  box-shadow: 0 4px 16px oklch(0.5 0.15 270 / 0.1), 0 1px 3px oklch(0 0 0 / 0.06);
 }
 :root:not(.dark) .card-glow .text-foreground {
   color: oklch(0.15 0 0);

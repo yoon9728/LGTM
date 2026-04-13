@@ -9,6 +9,7 @@ import { useState, useRef, useEffect } from "react";
 export function UserButton() {
   const { data: session, isPending } = useSession();
   const [open, setOpen] = useState(false);
+  const [imgError, setImgError] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -50,13 +51,15 @@ export function UserButton() {
     <div className="relative" ref={ref}>
       <button
         onClick={() => setOpen(!open)}
-        className="size-8 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-xs font-medium hover:opacity-90 transition-opacity"
+        className="size-8 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-xs font-medium hover:opacity-90 transition-opacity overflow-hidden"
       >
-        {user.image ? (
+        {user.image && !imgError ? (
           <img
             src={user.image}
             alt={user.name ?? ""}
-            className="size-8 rounded-full"
+            className="size-8 rounded-full object-cover"
+            referrerPolicy="no-referrer"
+            onError={() => setImgError(true)}
           />
         ) : (
           initials

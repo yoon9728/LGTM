@@ -3,6 +3,7 @@
 import { useState, useCallback, useRef, useEffect } from "react";
 import dynamic from "next/dynamic";
 import { Button } from "@/components/ui/button";
+import { useTheme } from "@/components/theme-provider";
 import { languages, getMonacoLanguage } from "@/lib/language-registry";
 import {
   CodeIcon,
@@ -15,8 +16,15 @@ import {
 const MonacoEditor = dynamic(() => import("@monaco-editor/react"), {
   ssr: false,
   loading: () => (
-    <div className="h-[200px] flex items-center justify-center text-sm text-muted-foreground border border-border rounded-lg bg-card/50">
-      Loading editor...
+    <div className="h-[200px] rounded-lg border border-border bg-card/50 overflow-hidden">
+      <div className="h-full flex flex-col p-4 gap-2 animate-pulse">
+        <div className="h-3 w-3/4 rounded bg-muted" />
+        <div className="h-3 w-1/2 rounded bg-muted" />
+        <div className="h-3 w-2/3 rounded bg-muted" />
+        <div className="h-3 w-1/3 rounded bg-muted" />
+        <div className="flex-1" />
+        <div className="h-3 w-1/4 rounded bg-muted" />
+      </div>
     </div>
   ),
 });
@@ -41,6 +49,7 @@ export function BlockEditor({
   defaultLanguage,
   templates,
 }: BlockEditorProps) {
+  const { theme } = useTheme();
   const [showLanguageMenu, setShowLanguageMenu] = useState<string | null>(null);
   // Use a ref to always have the latest blocks for callbacks
   const blocksRef = useRef(blocks);
@@ -206,7 +215,7 @@ export function BlockEditor({
                 language={getMonacoLanguage(block.language ?? "javascript")}
                 value={block.content}
                 onChange={(value) => updateBlock(block.id, value ?? "")}
-                theme="vs-dark"
+                theme={theme === "dark" ? "vs-dark" : "light"}
                 options={{
                   minimap: { enabled: false },
                   fontSize: 13,

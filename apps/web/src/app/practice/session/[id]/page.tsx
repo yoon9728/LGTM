@@ -21,6 +21,7 @@ import {
   ArrowLeftIcon,
   Loader2Icon,
   ShuffleIcon,
+  ClockIcon,
 } from "lucide-react";
 
 const CATEGORY_LABELS: Record<string, string> = {
@@ -29,6 +30,14 @@ const CATEGORY_LABELS: Record<string, string> = {
   debugging: "Debugging",
   data_analysis: "Data Analysis",
   practical_coding: "Practical Coding",
+};
+
+const CATEGORY_COLORS: Record<string, string> = {
+  code_review: "text-blue-500",
+  system_design: "text-violet-500",
+  debugging: "text-amber-500",
+  data_analysis: "text-emerald-500",
+  practical_coding: "text-rose-500",
 };
 
 type Step = "loading" | "diff" | "analysis" | "result";
@@ -78,12 +87,23 @@ export default function SessionPage({ params }: { params: Promise<{ id: string }
 
   const [guestCompletions, setGuestCompletions] = useState(0);
 
+  // Session timer
+  const [elapsed, setElapsed] = useState(0);
+
   const rightPanelRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const stored = localStorage.getItem(GUEST_STORAGE_KEY);
     if (stored) setGuestCompletions(parseInt(stored) || 0);
   }, []);
+
+  // Timer runs only during answer writing
+  useEffect(() => {
+    if (step === "analysis") {
+      const id = setInterval(() => setElapsed((e) => e + 1), 1000);
+      return () => clearInterval(id);
+    }
+  }, [step]);
 
   // Load session
   useEffect(() => {
@@ -263,6 +283,12 @@ export default function SessionPage({ params }: { params: Promise<{ id: string }
   const sessionLanguage = selectedLanguage ?? session?.language ?? session?.question.language ?? null;
   const backUrl = session ? `/practice/${category}/${session.question.type}` : "/practice";
   const categoryLabel = CATEGORY_LABELS[category] ?? "Practice";
+
+  const formatTime = (seconds: number) => {
+    const m = Math.floor(seconds / 60);
+    const s = seconds % 60;
+    return `${m}:${s.toString().padStart(2, "0")}`;
+  };
   const guestLimitReached = !isAuthenticated && guestCompletions >= GUEST_LIMIT;
 
   const stepNumber = step === "diff" ? 1 : step === "analysis" ? 2 : step === "result" ? 3 : 0;
@@ -296,7 +322,7 @@ export default function SessionPage({ params }: { params: Promise<{ id: string }
     <div className="space-y-4">
       <div className="space-y-2">
         <div className="flex items-center gap-2">
-          <p className="text-xs font-semibold tracking-wide uppercase text-muted-foreground">
+          <p className={`text-xs font-semibold tracking-wide uppercase ${CATEGORY_COLORS[category] ?? "text-muted-foreground"}`}>
             01 · {categoryLabel}
           </p>
           <span className="text-[10px] font-mono tracking-wide border border-border rounded px-1.5 py-0.5 text-muted-foreground">
@@ -389,27 +415,33 @@ export default function SessionPage({ params }: { params: Promise<{ id: string }
               <label htmlFor="summary" className="text-sm font-medium text-foreground">
                 Summary <span className="text-muted-foreground font-normal">— the single most important issue</span>
               </label>
-              <Textarea
-                id="summary"
-                value={summary}
-                onChange={(e) => setSummary(e.target.value)}
-                placeholder="The biggest problem in this code is..."
-                rows={3}
-                disabled={step === "result"}
-              />
+              {step === "result" ? (
+                <p className="text-sm text-foreground/80 whitespace-pre-wrap bg-muted/30 rounded-lg px-4 py-3">{summary || "—"}</p>
+              ) : (
+                <Textarea
+                  id="summary"
+                  value={summary}
+                  onChange={(e) => setSummary(e.target.value)}
+                  placeholder="The biggest problem in this code is..."
+                  rows={3}
+                />
+              )}
             </div>
             <div className="space-y-2">
               <label htmlFor="findings" className="text-sm font-medium text-foreground">
                 Findings <span className="text-muted-foreground font-normal">— what you found and why it matters</span>
               </label>
-              <Textarea
-                id="findings"
-                value={findings}
-                onChange={(e) => setFindings(e.target.value)}
-                placeholder={"1. Security: SQL injection in line 12...\n2. Performance: N+1 query in the loop...\n3. Error handling: unhandled promise rejection..."}
-                rows={8}
-                disabled={step === "result"}
-              />
+              {step === "result" ? (
+                <p className="text-sm text-foreground/80 whitespace-pre-wrap bg-muted/30 rounded-lg px-4 py-3">{findings || "—"}</p>
+              ) : (
+                <Textarea
+                  id="findings"
+                  value={findings}
+                  onChange={(e) => setFindings(e.target.value)}
+                  placeholder={"1. Security: SQL injection in line 12...\n2. Performance: N+1 query in the loop...\n3. Error handling: unhandled promise rejection..."}
+                  rows={8}
+                />
+              )}
             </div>
           </>
         )}
@@ -417,58 +449,29 @@ export default function SessionPage({ params }: { params: Promise<{ id: string }
         {/* System Design Form */}
         {category === "system_design" && (
           <>
-            <div className="space-y-2">
-              <label htmlFor="overview" className="text-sm font-medium text-foreground">
-                Architecture Overview <span className="text-muted-foreground font-normal">— high-level system description</span>
-              </label>
-              <Textarea
-                id="overview"
-                value={overview}
-                onChange={(e) => setOverview(e.target.value)}
-                placeholder="The system uses a microservices architecture with..."
-                rows={4}
-                disabled={step === "result"}
-              />
-            </div>
-            <div className="space-y-2">
-              <label htmlFor="components" className="text-sm font-medium text-foreground">
-                Key Components <span className="text-muted-foreground font-normal">— what are the main pieces and how they interact</span>
-              </label>
-              <Textarea
-                id="components"
-                value={components}
-                onChange={(e) => setComponents(e.target.value)}
-                placeholder={"1. API Gateway — routes requests, handles auth\n2. Message Queue — async processing\n3. Cache Layer — Redis for hot data..."}
-                rows={6}
-                disabled={step === "result"}
-              />
-            </div>
-            <div className="space-y-2">
-              <label htmlFor="tradeoffs" className="text-sm font-medium text-foreground">
-                Tradeoffs <span className="text-muted-foreground font-normal">— what you chose and what you gave up</span>
-              </label>
-              <Textarea
-                id="tradeoffs"
-                value={tradeoffs}
-                onChange={(e) => setTradeoffs(e.target.value)}
-                placeholder="Chose eventual consistency over strong consistency because..."
-                rows={4}
-                disabled={step === "result"}
-              />
-            </div>
-            <div className="space-y-2">
-              <label htmlFor="scaling" className="text-sm font-medium text-foreground">
-                Scaling Strategy <span className="text-muted-foreground font-normal">— how to handle growth</span>
-              </label>
-              <Textarea
-                id="scaling"
-                value={scalingStrategy}
-                onChange={(e) => setScalingStrategy(e.target.value)}
-                placeholder="Horizontal scaling via sharding by user_id. Read replicas for..."
-                rows={4}
-                disabled={step === "result"}
-              />
-            </div>
+            {([
+              { id: "overview", label: "Architecture Overview", hint: "high-level system description", value: overview, set: setOverview, placeholder: "The system uses a microservices architecture with...", rows: 4 },
+              { id: "components", label: "Key Components", hint: "what are the main pieces and how they interact", value: components, set: setComponents, placeholder: "1. API Gateway — routes requests, handles auth\n2. Message Queue — async processing\n3. Cache Layer — Redis for hot data...", rows: 6 },
+              { id: "tradeoffs", label: "Tradeoffs", hint: "what you chose and what you gave up", value: tradeoffs, set: setTradeoffs, placeholder: "Chose eventual consistency over strong consistency because...", rows: 4 },
+              { id: "scaling", label: "Scaling Strategy", hint: "how to handle growth", value: scalingStrategy, set: setScalingStrategy, placeholder: "Horizontal scaling via sharding by user_id. Read replicas for...", rows: 4 },
+            ] as const).map((field) => (
+              <div key={field.id} className="space-y-2">
+                <label htmlFor={field.id} className="text-sm font-medium text-foreground">
+                  {field.label} <span className="text-muted-foreground font-normal">— {field.hint}</span>
+                </label>
+                {step === "result" ? (
+                  <p className="text-sm text-foreground/80 whitespace-pre-wrap bg-muted/30 rounded-lg px-4 py-3">{field.value || "—"}</p>
+                ) : (
+                  <Textarea
+                    id={field.id}
+                    value={field.value}
+                    onChange={(e) => field.set(e.target.value)}
+                    placeholder={field.placeholder}
+                    rows={field.rows}
+                  />
+                )}
+              </div>
+            ))}
           </>
         )}
 
@@ -479,27 +482,33 @@ export default function SessionPage({ params }: { params: Promise<{ id: string }
               <label htmlFor="rootCause" className="text-sm font-medium text-foreground">
                 Root Cause <span className="text-muted-foreground font-normal">— what exactly is causing the bug</span>
               </label>
-              <Textarea
-                id="rootCause"
-                value={rootCause}
-                onChange={(e) => setRootCause(e.target.value)}
-                placeholder="The bug is caused by a race condition between..."
-                rows={4}
-                disabled={step === "result"}
-              />
+              {step === "result" ? (
+                <p className="text-sm text-foreground/80 whitespace-pre-wrap bg-muted/30 rounded-lg px-4 py-3">{rootCause || "—"}</p>
+              ) : (
+                <Textarea
+                  id="rootCause"
+                  value={rootCause}
+                  onChange={(e) => setRootCause(e.target.value)}
+                  placeholder="The bug is caused by a race condition between..."
+                  rows={4}
+                />
+              )}
             </div>
             <div className="space-y-2">
               <label htmlFor="evidence" className="text-sm font-medium text-foreground">
                 Evidence & Reasoning <span className="text-muted-foreground font-normal">— how you identified this</span>
               </label>
-              <Textarea
-                id="evidence"
-                value={evidence}
-                onChange={(e) => setEvidence(e.target.value)}
-                placeholder={"Line 42: the mutex is acquired after the check, creating a TOCTOU window...\nThe stack trace shows the thread interleaving at..."}
-                rows={6}
-                disabled={step === "result"}
-              />
+              {step === "result" ? (
+                <p className="text-sm text-foreground/80 whitespace-pre-wrap bg-muted/30 rounded-lg px-4 py-3">{evidence || "—"}</p>
+              ) : (
+                <Textarea
+                  id="evidence"
+                  value={evidence}
+                  onChange={(e) => setEvidence(e.target.value)}
+                  placeholder={"Line 42: the mutex is acquired after the check, creating a TOCTOU window...\nThe stack trace shows the thread interleaving at..."}
+                  rows={6}
+                />
+              )}
             </div>
             <div className="space-y-2">
               <label className="text-sm font-medium text-foreground">
@@ -543,27 +552,33 @@ export default function SessionPage({ params }: { params: Promise<{ id: string }
               <label htmlFor="explanation" className="text-sm font-medium text-foreground">
                 Explanation <span className="text-muted-foreground font-normal">— walk through your approach</span>
               </label>
-              <Textarea
-                id="explanation"
-                value={explanation}
-                onChange={(e) => setExplanation(e.target.value)}
-                placeholder="I used a LEFT JOIN to include users with no orders. The HAVING clause filters..."
-                rows={4}
-                disabled={step === "result"}
-              />
+              {step === "result" ? (
+                <p className="text-sm text-foreground/80 whitespace-pre-wrap bg-muted/30 rounded-lg px-4 py-3">{explanation || "—"}</p>
+              ) : (
+                <Textarea
+                  id="explanation"
+                  value={explanation}
+                  onChange={(e) => setExplanation(e.target.value)}
+                  placeholder="I used a LEFT JOIN to include users with no orders. The HAVING clause filters..."
+                  rows={4}
+                />
+              )}
             </div>
             <div className="space-y-2">
               <label htmlFor="optimization" className="text-sm font-medium text-foreground">
                 Optimization <span className="text-muted-foreground font-normal">— performance considerations</span>
               </label>
-              <Textarea
-                id="optimization"
-                value={optimization}
-                onChange={(e) => setOptimization(e.target.value)}
-                placeholder="Add index on orders(user_id, created_at). For large datasets, consider..."
-                rows={3}
-                disabled={step === "result"}
-              />
+              {step === "result" ? (
+                <p className="text-sm text-foreground/80 whitespace-pre-wrap bg-muted/30 rounded-lg px-4 py-3">{optimization || "—"}</p>
+              ) : (
+                <Textarea
+                  id="optimization"
+                  value={optimization}
+                  onChange={(e) => setOptimization(e.target.value)}
+                  placeholder="Add index on orders(user_id, created_at). For large datasets, consider..."
+                  rows={3}
+                />
+              )}
             </div>
           </>
         )}
@@ -596,35 +611,53 @@ export default function SessionPage({ params }: { params: Promise<{ id: string }
               <label htmlFor="approach" className="text-sm font-medium text-foreground">
                 Approach <span className="text-muted-foreground font-normal">— explain your strategy</span>
               </label>
-              <Textarea
-                id="approach"
-                value={approach}
-                onChange={(e) => setApproach(e.target.value)}
-                placeholder="Used a hash map for O(1) lookups to avoid the brute-force O(n²) approach..."
-                rows={3}
-                disabled={step === "result"}
-              />
+              {step === "result" ? (
+                <p className="text-sm text-foreground/80 whitespace-pre-wrap bg-muted/30 rounded-lg px-4 py-3">{approach || "—"}</p>
+              ) : (
+                <Textarea
+                  id="approach"
+                  value={approach}
+                  onChange={(e) => setApproach(e.target.value)}
+                  placeholder="Used a hash map for O(1) lookups to avoid the brute-force O(n²) approach..."
+                  rows={3}
+                />
+              )}
             </div>
             <div className="space-y-2">
               <label htmlFor="complexity" className="text-sm font-medium text-foreground">
                 Complexity Analysis <span className="text-muted-foreground font-normal">— time and space</span>
               </label>
-              <Textarea
-                id="complexity"
-                value={complexity}
-                onChange={(e) => setComplexity(e.target.value)}
-                placeholder="Time: O(n) — single pass through the array. Space: O(n) — hash map stores up to n entries."
-                rows={2}
-                disabled={step === "result"}
-              />
+              {step === "result" ? (
+                <p className="text-sm text-foreground/80 whitespace-pre-wrap bg-muted/30 rounded-lg px-4 py-3">{complexity || "—"}</p>
+              ) : (
+                <Textarea
+                  id="complexity"
+                  value={complexity}
+                  onChange={(e) => setComplexity(e.target.value)}
+                  placeholder="Time: O(n) — single pass through the array. Space: O(n) — hash map stores up to n entries."
+                  rows={2}
+                />
+              )}
             </div>
           </>
         )}
 
         {step === "analysis" && (
-          <Button type="submit" disabled={loading || !isFormValid()}>
-            {loading ? <Loader2Icon className="size-4 animate-spin" /> : "Submit answer"}
-          </Button>
+          <div className="space-y-2">
+            <Button type="submit" disabled={loading || !isFormValid()}>
+              {loading ? (
+                <>
+                  <Loader2Icon className="size-4 animate-spin mr-2" />
+                  Evaluating...
+                </>
+              ) : (
+                "Submit & get AI evaluation"
+              )}
+            </Button>
+            <p className="text-[11px] text-muted-foreground">
+              Your answer will be graded by AI against expert criteria
+            </p>
+          </div>
         )}
       </form>
     </div>
@@ -745,7 +778,15 @@ export default function SessionPage({ params }: { params: Promise<{ id: string }
               <span className="text-xs text-muted-foreground">Back to questions</span>
             </div>
 
-            <Stepper current={stepNumber} />
+            <div className="flex items-center justify-between">
+              <Stepper current={stepNumber} />
+              {step !== "diff" && (
+                <div className="flex items-center gap-1.5 text-xs font-mono text-muted-foreground">
+                  <ClockIcon className="size-3.5" />
+                  <span>{formatTime(elapsed)}</span>
+                </div>
+              )}
+            </div>
 
             {/* Layout: single column (diff) or split (analysis/result) */}
             {!isSplit ? (
@@ -755,19 +796,20 @@ export default function SessionPage({ params }: { params: Promise<{ id: string }
               </div>
             ) : (
               /* -- Split layout: problem left, answer right -- */
-              <div className="flex gap-6 pb-24 animate-fade-in-up" style={{ animationDuration: "0.5s" }}>
-                {/* Left: Problem (sticky, scrollable) */}
-                <div className="w-1/2 shrink-0">
-                  <div className="sticky top-24 max-h-[calc(100dvh-8rem)] overflow-y-auto pr-4 space-y-4 scrollbar-thin">
+              <div className="flex flex-col lg:flex-row gap-6 pb-24 animate-fade-in-up" style={{ animationDuration: "0.5s" }}>
+                {/* Left: Problem (sticky on desktop, static on mobile) */}
+                <div className="w-full lg:w-1/2 lg:shrink-0">
+                  <div className="lg:sticky lg:top-24 lg:max-h-[calc(100dvh-8rem)] lg:overflow-y-auto lg:pr-4 space-y-4 scrollbar-thin">
                     {problemPanel}
                   </div>
                 </div>
 
-                {/* Vertical divider */}
-                <div className="w-px bg-border shrink-0" />
+                {/* Divider — vertical on desktop, horizontal on mobile */}
+                <div className="hidden lg:block w-px bg-border shrink-0" />
+                <div className="lg:hidden h-px bg-border" />
 
                 {/* Right: Answer + Result */}
-                <div className="w-1/2 min-w-0 space-y-10">
+                <div className="w-full lg:w-1/2 min-w-0 space-y-10">
                   {analysisPanel}
                   {resultPanel}
                 </div>

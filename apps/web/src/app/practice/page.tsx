@@ -31,6 +31,14 @@ const CATEGORY_ICONS: Record<string, React.ReactNode> = {
   practical_coding: <PencilLineIcon className="size-5" />,
 };
 
+const CATEGORY_ACCENT: Record<string, string> = {
+  code_review: "bg-blue-500/10 text-blue-500",
+  system_design: "bg-violet-500/10 text-violet-500",
+  debugging: "bg-amber-500/10 text-amber-500",
+  data_analysis: "bg-emerald-500/10 text-emerald-500",
+  practical_coding: "bg-rose-500/10 text-rose-500",
+};
+
 export default function PracticeTypesPage() {
   const { data: authSession, isPending } = useSession();
   const isAuthenticated = !!authSession?.user;
@@ -75,7 +83,7 @@ export default function PracticeTypesPage() {
   }
 
   return (
-    <div className="max-w-4xl mx-auto px-6 pb-24">
+    <div className="max-w-5xl mx-auto px-6 pb-24">
       {/* Header */}
       <header className="flex items-center justify-between py-6 border-b border-border mb-10">
         <div className="flex items-center gap-4">
@@ -147,7 +155,7 @@ export default function PracticeTypesPage() {
                 <Link key={cat.id} href={`/practice/${cat.id}`}>
                   <div className="scroll-reveal card-glow group text-left rounded-xl p-6 space-y-3 h-full">
                     <div className="flex items-start justify-between">
-                      <div className="size-10 rounded-lg bg-primary/10 flex items-center justify-center text-primary">
+                      <div className={`size-10 rounded-lg flex items-center justify-center ${CATEGORY_ACCENT[cat.id] ?? "bg-primary/10 text-primary"}`}>
                         {CATEGORY_ICONS[cat.id] ?? <CodeIcon className="size-5" />}
                       </div>
                       {stats && (
@@ -176,7 +184,7 @@ export default function PracticeTypesPage() {
                         </span>
                       )}
                     </div>
-                    {stats && stats.total > 0 && (
+                    {stats && stats.completed > 0 && stats.total > 0 && (
                       <div className="w-full bg-muted rounded-full h-1.5">
                         <div
                           className="progress-gradient h-1.5 transition-all"

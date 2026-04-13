@@ -2,7 +2,7 @@
 
 import { cn } from "@/lib/utils";
 
-const STEPS = ["Diff", "Analysis", "Result"] as const;
+const STEPS = ["Problem", "Answer", "Evaluation"] as const;
 
 interface StepperProps {
   current: number;

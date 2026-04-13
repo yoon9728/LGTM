@@ -6,6 +6,11 @@
   "scripts": {
     "dev": "npm run dev:api & npm run dev:web",
     "dev:web": "cd apps/web && npx next dev --port 4173",
-    "dev:api": "cd apps/api && npx tsx watch src/index.ts"
+    "dev:api": "cd apps/api && npx tsx watch src/index.ts",
+    "screenshots": "npx tsx scripts/take-screenshots.ts"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.59.1",
+    "playwright": "^1.59.1"
   }
 }

@@ -194,8 +194,15 @@ export default function DashboardPage() {
             {scoreTrend.length > 0 ? (
               <ScoreLineChart data={scoreTrend} />
             ) : (
-              <div className="h-[280px] flex items-center justify-center text-sm text-muted-foreground">
-                Complete some sessions to see your trend
+              <div className="h-[280px] flex flex-col items-center justify-center gap-3 text-center">
+                <BarChart3Icon className="size-8 text-muted-foreground/30" />
+                <div>
+                  <p className="text-sm font-medium text-muted-foreground">No scores yet</p>
+                  <p className="text-xs text-muted-foreground/60 mt-1">Complete a session to see your score trend</p>
+                </div>
+                <Link href="/practice">
+                  <Button size="sm" variant="outline" className="mt-1">Start practicing</Button>
+                </Link>
               </div>
             )}
           </Card>
@@ -208,8 +215,12 @@ export default function DashboardPage() {
             {categoryStats.length > 0 ? (
               <CategoryRadarChart data={categoryStats} />
             ) : (
-              <div className="h-[280px] flex items-center justify-center text-sm text-muted-foreground">
-                Practice different categories to see your profile
+              <div className="h-[280px] flex flex-col items-center justify-center gap-3 text-center">
+                <TargetIcon className="size-8 text-muted-foreground/30" />
+                <div>
+                  <p className="text-sm font-medium text-muted-foreground">No data yet</p>
+                  <p className="text-xs text-muted-foreground/60 mt-1">Practice different categories to see your strengths</p>
+                </div>
               </div>
             )}
           </Card>
@@ -237,12 +248,13 @@ export default function DashboardPage() {
                   <p className="text-xs font-medium text-muted-foreground">
                     {CATEGORY_LABELS[cat]}
                   </p>
-                  <p className="text-2xl font-bold font-mono">
-                    {stat?.avgScore ?? "—"}
+                  <p className={`text-2xl font-bold font-mono ${stat?.avgScore != null ? "" : "text-muted-foreground/40"}`}>
+                    {stat?.avgScore ?? 0}
                   </p>
                   <p className="text-[10px] text-muted-foreground">
-                    {stat?.sessionCount ?? 0} session
-                    {(stat?.sessionCount ?? 0) !== 1 ? "s" : ""}
+                    {stat?.sessionCount
+                      ? `${stat.sessionCount} session${stat.sessionCount !== 1 ? "s" : ""}`
+                      : "Not started"}
                   </p>
                 </div>
               );

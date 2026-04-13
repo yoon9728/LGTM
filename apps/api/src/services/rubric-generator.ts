@@ -9,21 +9,28 @@
 const CATEGORY_LENSES: Record<string, string> = {
   code_review: `### Analysis Lens: Code Review
 Build criteria around these GRADUATED dimensions (fundamental → advanced):
-1. FUNDAMENTAL: Does the candidate recognize the CLASS of security/correctness issue? (e.g., "identifies injection risk" — partial if vague, covered if specific)
+1. FUNDAMENTAL: Does the candidate recognize the CLASS of security/correctness issue? (e.g., "identifies injection risk" — partial if vague, covered if specific with mechanism explanation)
 2. FUNDAMENTAL: Does the candidate understand the REGRESSION — what was safe before and what broke? (e.g., "recognizes that parameterized queries were removed")
-3. INTERMEDIATE: Can the candidate identify ALL vulnerable entry points, not just the most obvious one?
-4. INTERMEDIATE: Does the candidate explain the IMPACT — what an attacker could actually do?
-5. ADVANCED: Does the candidate notice secondary issues beyond the main vulnerability? (API contract changes, performance, missing validations)
+3. INTERMEDIATE: Can the candidate identify ALL vulnerable entry points, not just the most obvious one? (partial = finds the main one, covered = finds additional ones)
+4. INTERMEDIATE: Does the candidate explain the IMPACT — what an attacker could actually do, with specific scenarios?
+5. ADVANCED: Does the candidate provide COMPREHENSIVE secondary analysis beyond the main vulnerability? (API contract changes, performance, missing validations, architectural implications — covered requires addressing 2+ secondary concerns with specific detail)
 
-IMPORTANT: If the same vulnerability type appears in multiple parameters, make it ONE criterion that tests whether the candidate finds all of them (partial = finds one, covered = finds all).`,
+IMPORTANT: If the same vulnerability type appears in multiple parameters, make it ONE criterion that tests whether the candidate finds all of them (partial = finds one, covered = finds all).
+IMPORTANT: Merely IDENTIFYING an issue is "partial". "Covered" requires EXPLAINING the mechanism or demonstrating deep understanding. A one-line correct finding = partial, not covered.`,
 
   system_design: `### Analysis Lens: System Design
 Build criteria around these GRADUATED dimensions (fundamental → advanced):
-1. FUNDAMENTAL: Does the candidate propose a reasonable high-level architecture with appropriate components? (partial = lists components, covered = explains why each component)
-2. FUNDAMENTAL: Does the candidate address the data model and storage strategy?
-3. INTERMEDIATE: Does the candidate design for the specific scale requirements stated in the problem (reads/sec, writes/sec, latency)?
-4. INTERMEDIATE: Does the candidate discuss trade-offs between their choices and alternatives?
-5. ADVANCED: Does the candidate address operational concerns (failure modes, monitoring, scaling strategy over time)?`,
+1. FUNDAMENTAL: Does the candidate propose a reasonable high-level architecture with appropriate components? (partial = names 3+ relevant infrastructure components in any form, covered = explains how components connect and data flows between them)
+2. FUNDAMENTAL: Does the candidate show awareness of the access pattern and choose storage/messaging accordingly? (partial = mentions ANY database, cache, or queue by name or concept, covered = explains WHY they chose that storage type for this workload)
+3. INTERMEDIATE: Does the candidate design for the specific scale requirements stated in the problem? (partial = acknowledges scale with any concrete number, covered = calculates capacity or sizes components)
+4. INTERMEDIATE: Does the candidate discuss trade-offs between their choices and alternatives? (partial = mentions one tradeoff, covered = compares alternatives with reasoning)
+5. ADVANCED: Does the candidate provide a comprehensive operational plan? (covered requires EXPLICIT discussion of failure modes AND scaling phases or monitoring — not just mentioning "monitoring")
+
+IMPORTANT for system_design:
+- A 40pt-level answer that describes an event-driven or request-based architecture with named components (queue, cache, DB, workers) MUST get at least partial on criteria 1 AND 2. It should also get partial on criteria 3-4 if it mentions any scaling or tradeoff concept.
+- criterion 1 partial threshold is VERY LOW: naming 3+ relevant infrastructure components = partial. Describing an architecture flow (e.g., "API → queue → workers → DB") = covered.
+- criterion 2 partial threshold is VERY LOW: mentioning ANY storage technology or pattern = partial.
+- Do NOT make fundamental criteria about specific technologies. "Uses a message queue for async processing" is covered whether they say Kafka, RabbitMQ, SQS, or just "message queue".`,
 
   debugging: `### Analysis Lens: Debugging
 Build criteria around these GRADUATED dimensions (fundamental → advanced):
@@ -50,15 +57,17 @@ IMPORTANT for data_analysis:
   practical_coding: `### Analysis Lens: Practical Coding
 Build criteria around these GRADUATED dimensions (fundamental → advanced):
 1. FUNDAMENTAL: Does the code correctly implement the core operations described in the problem? (partial = code runs and handles the basic case even with bugs, covered = all core operations work correctly)
-2. FUNDAMENTAL: Does the candidate explain their approach and demonstrate understanding of what the problem requires? (partial = describes the general idea, covered = explains why this approach works)
+2. FUNDAMENTAL: Does the candidate WRITE a clear explanation of their approach? (partial = 1-2 sentences describing the general idea, covered = multi-sentence explanation of HOW and WHY the approach works. NOTE: "covered" requires WRITTEN text — correct code alone does NOT satisfy this criterion)
 3. INTERMEDIATE: Does the implementation handle edge cases (empty input, capacity limits, duplicate keys, boundary conditions)?
-4. INTERMEDIATE: Is the complexity analysis correct and does the implementation meet the stated time complexity requirement? (partial = mentions complexity, covered = correct analysis with justification)
-5. ADVANCED: Does the candidate discuss design choices, trade-offs, or why they rejected alternative approaches?
+4. INTERMEDIATE: Is the complexity analysis correct and does the implementation meet the stated time complexity requirement? (partial = mentions complexity, covered = correct Big-O with justification for WHY it achieves that complexity)
+5. ADVANCED: Does the candidate EXPLICITLY compare alternative approaches and explain why they chose this one? (partial = briefly mentions one alternative exists, covered = names 2+ alternatives, explains their trade-offs, and justifies why the chosen approach is better. A correct implementation with no written comparison = "missing" on this criterion)
 
 IMPORTANT for practical_coding:
 - A correct implementation that is O(n) instead of O(1) should still earn "covered" on criterion 1 (correctness) and "partial" on criterion 4 (complexity). Do NOT penalize correctness for suboptimal complexity.
 - Multiple valid implementations exist. Frame criteria as behavioral requirements (e.g., "handles eviction correctly") not specific implementations (e.g., "uses doubly linked list").
-- Criterion 2 is about EXPLANATION quality, not code quality. A working solution with a brief explanation = partial. A working solution with clear reasoning = covered.`,
+- Criterion 2 is about WRITTEN EXPLANATION quality, not code quality. A working solution with a one-line approach description like "Hash map + linked list" = partial (too brief). A working solution with a paragraph explaining the design = covered.
+- Criterion 5 (design choices/trade-offs) is what separates Strong from Expert. "covered" REQUIRES explicit text comparing alternatives. Perfect code with a one-line approach description should get at most 4/5 covered (criteria 1,3,4 + partial on 2), placing it in the Strong range (68-85).
+- strongSignals should require deep analysis: performance implications, memory optimization, why rejected approaches fail, handling of constraint boundaries. A correct-but-unexplained implementation should NOT trigger strongSignals.`,
 };
 
 const DEFAULT_LENS = `### Analysis Lens: General
@@ -107,12 +116,16 @@ MORE GOOD EXAMPLES:
 **Difficulty distribution (MANDATORY):**
 1. Item 1-2: FUNDAMENTAL — these must be VERY easy to get "partial" on. A single sentence mentioning the right problem area = partial. Example: "there's a security issue" should earn partial on a security criterion. A junior/mid developer who understands what category of problem this is should get partial. Specificity earns "covered".
 2. Item 3-4: INTERMEDIATE — require more specific analysis. Test whether the candidate identifies specific details, root causes, or important secondary issues. Even here, a vague mention of the right topic = partial.
-3. Item 5: ADVANCED — requires expert-level insight. Test whether the candidate sees non-obvious implications, edge cases, or systemic concerns. Only strong answers get partial here.
+3. Item 5: ADVANCED — requires expert-level insight. This item MUST test something that ONLY appears in truly exceptional answers: deep trade-off analysis, non-obvious implications, systemic concerns, or explicit comparison of alternatives with reasoning. A correct-but-brief answer should NOT satisfy this criterion. "Covered" on item 5 requires EXPLICIT WRITTEN ANALYSIS, not just correct behavior demonstrated through code.
+
+**Technology-agnostic fundamentals:**
+Items 1-2 must test ARCHITECTURAL CONCEPTS or problem understanding, not specific technologies. "Proposes a caching layer for read-heavy access" is good; "Uses Redis for caching" is bad for a fundamental criterion. Any reasonable technology choice that fulfills the concept should earn "covered".
 
 **Other rules:**
 - Derive items directly from the diff/code/scenario — no generic filler
 - Each item must be independently evaluable (one concept per item)
 - **NO OVERLAP**: Each criterion must test a DISTINCT dimension. If two criteria would always be covered/missed together, merge them.
+- Each criterion must be satisfiable by MULTIPLE valid approaches. If only one specific answer satisfies it, the criterion is too narrow.
 
 ### strongSignals (2–4 items)
 These distinguish top-10% answers. One level deeper than mustCover.
