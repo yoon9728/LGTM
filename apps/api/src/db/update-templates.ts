@@ -7,37 +7,33 @@ config({ path: resolve(__dirname, "..", "..", "..", "..", ".env") });
 
 import { neon } from "@neondatabase/serverless";
 import { drizzle } from "drizzle-orm/neon-http";
+import { eq } from "drizzle-orm";
 import { questions as questionsTable } from "./schema.js";
 import { getAll } from "../data/questions.js";
 
 const sql = neon(process.env.DATABASE_URL!);
 const db = drizzle(sql);
 
-async function seed() {
-  console.log("Seeding questions...");
+async function updateExisting() {
+  console.log("Updating existing questions with templates and guest flags...");
 
   const allQuestions = getAll();
+  let updated = 0;
 
   for (const q of allQuestions) {
     await db
-      .insert(questionsTable)
-      .values({
-        id: q.id,
-        category: q.category,
-        type: q.type,
-        language: q.language ?? null,
-        difficulty: q.difficulty ?? "medium",
-        title: q.title,
-        prompt: q.prompt,
-        diff: q.diff,
-        rubric: q.rubric,
+      .update(questionsTable)
+      .set({
         templates: q.templates ?? null,
         guest: q.guest ?? false,
+        difficulty: q.difficulty ?? "medium",
+        language: q.language ?? null,
       })
-      .onConflictDoNothing();
+      .where(eq(questionsTable.id, q.id));
+    updated++;
   }
 
-  console.log(`Seeded ${allQuestions.length} questions.`);
+  console.log(`Updated ${updated} questions.`);
 }
 
-seed().catch(console.error);
+updateExisting().catch(console.error);

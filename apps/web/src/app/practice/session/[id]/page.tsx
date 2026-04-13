@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Separator } from "@/components/ui/separator";
+import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from "@/components/ui/resizable";
 import { Stepper } from "@/components/stepper";
 import { DiffViewer } from "@/components/diff-viewer";
 import { EvaluationResult } from "@/components/evaluation-result";
@@ -16,6 +17,8 @@ import { useSession } from "@/lib/auth-client";
 import { api } from "@/lib/api";
 import type { Session, Evaluation } from "@/lib/api";
 import { GUEST_LIMIT, GUEST_STORAGE_KEY } from "@/lib/guest";
+import { LoadingSpinner } from "@/components/loading-spinner";
+import { MobileNav } from "@/components/mobile-nav";
 import {
   ArrowRightIcon,
   ArrowLeftIcon,
@@ -298,7 +301,7 @@ export default function SessionPage({ params }: { params: Promise<{ id: string }
   if (step === "loading") {
     return (
       <div className="flex items-center justify-center min-h-dvh">
-        <Loader2Icon className="size-6 animate-spin text-muted-foreground" />
+        <LoadingSpinner size="lg" />
       </div>
     );
   }
@@ -754,6 +757,7 @@ export default function SessionPage({ params }: { params: Promise<{ id: string }
         <div className="flex items-center gap-2">
           <ThemeToggle />
           <UserButton />
+          <MobileNav />
         </div>
       </header>
 
@@ -795,25 +799,34 @@ export default function SessionPage({ params }: { params: Promise<{ id: string }
                 {problemPanel}
               </div>
             ) : (
-              /* -- Split layout: problem left, answer right -- */
-              <div className="flex flex-col lg:flex-row gap-6 pb-24 animate-fade-in-up" style={{ animationDuration: "0.5s" }}>
-                {/* Left: Problem (sticky on desktop, static on mobile) */}
-                <div className="w-full lg:w-1/2 lg:shrink-0">
-                  <div className="lg:sticky lg:top-24 lg:max-h-[calc(100dvh-8rem)] lg:overflow-y-auto lg:pr-4 space-y-4 scrollbar-thin">
-                    {problemPanel}
+              <>
+                {/* Mobile: stacked */}
+                <div className="lg:hidden flex flex-col gap-6 pb-24 animate-fade-in-up" style={{ animationDuration: "0.5s" }}>
+                  <div className="space-y-4">{problemPanel}</div>
+                  <div className="h-px bg-border" />
+                  <div className="space-y-10">
+                    {analysisPanel}
+                    {resultPanel}
                   </div>
                 </div>
-
-                {/* Divider — vertical on desktop, horizontal on mobile */}
-                <div className="hidden lg:block w-px bg-border shrink-0" />
-                <div className="lg:hidden h-px bg-border" />
-
-                {/* Right: Answer + Result */}
-                <div className="w-full lg:w-1/2 min-w-0 space-y-10">
-                  {analysisPanel}
-                  {resultPanel}
+                {/* Desktop: resizable panels */}
+                <div className="hidden lg:block pb-24 animate-fade-in-up" style={{ animationDuration: "0.5s" }}>
+                  <ResizablePanelGroup orientation="horizontal" className="min-h-[calc(100dvh-14rem)]">
+                    <ResizablePanel defaultSize={45} minSize={30} maxSize={65}>
+                      <div className="h-full overflow-y-auto pr-4 space-y-4 scrollbar-thin">
+                        {problemPanel}
+                      </div>
+                    </ResizablePanel>
+                    <ResizableHandle withHandle />
+                    <ResizablePanel defaultSize={55} minSize={30} maxSize={70}>
+                      <div className="h-full overflow-y-auto pl-4 space-y-10">
+                        {analysisPanel}
+                        {resultPanel}
+                      </div>
+                    </ResizablePanel>
+                  </ResizablePanelGroup>
                 </div>
-              </div>
+              </>
             )}
           </section>
         )}

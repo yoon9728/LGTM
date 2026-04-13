@@ -1,6 +1,5 @@
 import { Hono } from "hono";
 import { db } from "../data/store.js";
-import * as questions from "../data/questions.js";
 import { evaluate } from "../services/evaluation.js";
 import { optionalAuth, type AuthUser } from "../middleware/auth.js";
 import { getClientIp } from "../lib/ip.js";
@@ -62,13 +61,19 @@ export const sessionRoutes = new Hono()
 
     let question;
     if (body.questionId) {
-      question = questions.getById(body.questionId);
+      question = await db.questions.getById(body.questionId);
       if (!question) return c.json({ error: "Question not found" }, 404);
       if (isGuest && !question.guest) {
         return c.json({ error: "Authentication required for this question" }, 401);
       }
     } else {
-      question = questions.getRandomByCategory(body.category, body.type, body.language, isGuest);
+      question = await db.questions.getRandom({
+        category: body.category,
+        type: body.type,
+        language: body.language,
+        guestOnly: isGuest,
+      });
+      if (!question) return c.json({ error: "No questions available" }, 404);
     }
 
     // For practical_coding: use requested language, or fall back to question's language
@@ -82,8 +87,6 @@ export const sessionRoutes = new Hono()
       question,
       createdAt: new Date().toISOString(),
     });
-    // Ensure templates are included (in-memory only)
-    if (question.templates) session.question.templates = question.templates;
     return c.json({ ok: true, session, isGuest }, 201);
   })
 
@@ -111,11 +114,6 @@ export const sessionRoutes = new Hono()
     if (!session) return c.json({ error: "Session not found" }, 404);
     const isOwner = session.candidateId === "guest" || user?.id === session.candidateId;
     if (!isOwner) return c.json({ error: "Forbidden" }, 403);
-    // Merge templates from in-memory (DB doesn't store templates)
-    const inMemoryQ = questions.getById(session.question.id);
-    if (inMemoryQ?.templates) {
-      session.question.templates = inMemoryQ.templates;
-    }
     return c.json({ ok: true, session });
   })
 
@@ -141,7 +139,7 @@ export const sessionRoutes = new Hono()
     }
 
     retryUsage.set(session.id, retryCount + 1);
-    const question = questions.getById(session.question.id);
+    const question = await db.questions.getById(session.question.id);
     const evaluation = await evaluate(answer, question);
     return c.json({ ok: true, answer, evaluation, retried: true });
   });

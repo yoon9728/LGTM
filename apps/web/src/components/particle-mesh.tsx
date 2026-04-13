@@ -37,12 +37,12 @@ const DARK: ColorSet = {
 };
 
 const LIGHT: ColorSet = {
-  primary: { r: 30, g: 30, b: 60 },
-  accent: { r: 60, g: 40, b: 120 },
-  lineOpacity: 0.45,
-  dotOpacity: 1,
-  glowOpacity: 0.18,
-  signalOpacity: 0.9,
+  primary: { r: 100, g: 80, b: 200 },
+  accent: { r: 120, g: 70, b: 220 },
+  lineOpacity: 0.35,
+  dotOpacity: 0.9,
+  glowOpacity: 0.15,
+  signalOpacity: 0.8,
 };
 
 function getColors(): ColorSet {

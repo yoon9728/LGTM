@@ -112,6 +112,8 @@ export interface StatsOverview {
   completedSessions: number;
   avgScore: number | null;
   streak: number;
+  totalQuestions: number;
+  solvedQuestions: number;
 }
 
 export interface CategoryStat {
@@ -143,6 +145,56 @@ export interface UserStats {
   categoryStats: CategoryStat[];
   scoreTrend: ScoreTrendPoint[];
   recentSessions: RecentSession[];
+  weakestCategory: { category: string; avgScore: number | null } | null;
+}
+
+export interface CategoryDetailOverview {
+  sessionCount: number;
+  completedCount: number;
+  avgScore: number | null;
+  bestScore: number | null;
+  totalQuestions: number;
+  solvedQuestions: number;
+}
+
+export interface SubtopicStat {
+  type: string;
+  sessionCount: number;
+  avgScore: number | null;
+  bestScore: number | null;
+  totalQuestions: number;
+}
+
+export interface CriteriaInsightItem {
+  label: string;
+  covered: number;
+  total: number;
+  rate: number;
+}
+
+export interface CategoryDetailSession {
+  sessionId: string;
+  questionTitle: string;
+  type: string;
+  status: string;
+  score: number | null;
+  date: string;
+}
+
+export interface CategoryDetail {
+  overview: CategoryDetailOverview;
+  scoreTrend: { sessionId: string; score: number; type: string; date: string }[];
+  subtopicStats: SubtopicStat[];
+  criteriaInsights: {
+    mostCovered: CriteriaInsightItem[];
+    mostMissed: CriteriaInsightItem[];
+  };
+  sessions: CategoryDetailSession[];
+}
+
+/** Fire-and-forget ping to wake the API from cold start */
+export function warmUpApi() {
+  fetch(`${API_BASE}/health`, { method: "GET" }).catch(() => {});
 }
 
 export const api = {
@@ -197,4 +249,7 @@ export const api = {
 
   getStats: () =>
     request<{ stats: UserStats }>("/users/me/stats"),
+
+  getCategoryStats: (category: string) =>
+    request<CategoryDetail>(`/users/me/stats/${category}`),
 };

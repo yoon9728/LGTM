@@ -11,9 +11,10 @@ import { api } from "@/lib/api";
 import type { CategoryMeta, CategoryStats } from "@/lib/api";
 import { useScrollReveal } from "@/hooks/useScrollReveal";
 import { GUEST_LIMIT, GUEST_STORAGE_KEY } from "@/lib/guest";
+import { LoadingSpinner } from "@/components/loading-spinner";
+import { MobileNav } from "@/components/mobile-nav";
 import {
   ArrowRightIcon,
-  Loader2Icon,
   LockIcon,
   HistoryIcon,
   CodeIcon,
@@ -77,7 +78,7 @@ export default function PracticeTypesPage() {
   if (loading && categories.length === 0) {
     return (
       <div className="flex items-center justify-center min-h-dvh">
-        <Loader2Icon className="size-6 animate-spin text-muted-foreground" />
+        <LoadingSpinner size="lg" />
       </div>
     );
   }
@@ -109,6 +110,7 @@ export default function PracticeTypesPage() {
           )}
           <ThemeToggle />
           <UserButton />
+          <MobileNav />
         </div>
       </header>
 
@@ -142,7 +144,7 @@ export default function PracticeTypesPage() {
       {!guestLimitReached && (
         <section className="space-y-8 pt-4">
           <div className="space-y-3">
-            <h1 className="text-2xl font-semibold tracking-tight">Choose a category</h1>
+            <h1 className="text-2xl font-bold tracking-tight">Choose a category</h1>
             <p className="text-sm text-muted-foreground leading-relaxed max-w-lg">
               Each category tests a different professional skill. Pick one to explore sub-topics and questions.
             </p>

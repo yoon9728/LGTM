@@ -1,0 +1,24 @@
+services:
+  api:
+    build: ./apps/api
+    ports:
+      - "4300:4300"
+    env_file: .env
+    environment:
+      - NODE_ENV=production
+      - PORT=4300
+      - WEB_ORIGIN=${WEB_ORIGIN:-http://localhost:3000}
+    restart: unless-stopped
+
+  web:
+    build:
+      context: ./apps/web
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:4300}
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+    restart: unless-stopped
+    depends_on:
+      - api

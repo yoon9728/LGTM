@@ -10,9 +10,10 @@ import { UserButton } from "@/components/user-button";
 import { useSession } from "@/lib/auth-client";
 import { api } from "@/lib/api";
 import type { HistoryEntry } from "@/lib/api";
+import { LoadingSpinner } from "@/components/loading-spinner";
+import { MobileNav } from "@/components/mobile-nav";
 import {
   ArrowRightIcon,
-  Loader2Icon,
   CodeIcon,
   LayoutDashboardIcon,
   TerminalIcon,
@@ -67,7 +68,7 @@ export default function HistoryPage() {
   if (isPending || (!authSession?.user && !loading)) {
     return (
       <div className="flex items-center justify-center min-h-dvh">
-        <Loader2Icon className="size-6 animate-spin text-muted-foreground" />
+        <LoadingSpinner size="lg" />
       </div>
     );
   }
@@ -104,8 +105,15 @@ export default function HistoryPage() {
         <div className="flex items-center gap-2">
           <ThemeToggle />
           <UserButton />
+          <MobileNav />
         </div>
       </header>
+
+      {/* Title */}
+      <div className="mb-8">
+        <h1 className="text-2xl font-bold tracking-tight">Practice History</h1>
+        <p className="text-sm text-muted-foreground mt-1">Review your past sessions and track improvement</p>
+      </div>
 
       {/* Stats */}
       <div className="grid grid-cols-3 gap-4 mb-10">
@@ -162,7 +170,7 @@ export default function HistoryPage() {
       {/* History List */}
       {loading ? (
         <div className="flex justify-center py-12">
-          <Loader2Icon className="size-6 animate-spin text-muted-foreground" />
+          <LoadingSpinner size="md" />
         </div>
       ) : filteredHistory.length === 0 && filter === "all" ? (
         <div className="text-center py-20 space-y-4">

@@ -2,7 +2,8 @@ export interface Question {
   id: string;
   category: string;    // 대분류: code_review, system_design, debugging, data_analysis, practical_coding
   type: string;        // 서브카테고리: security_review, scalability, runtime_error, sql_query, etc.
-  language?: string;   // practical_coding 전용: java, python, c_cpp, javascript, rust, go, kotlin, typescript
+  difficulty?: "easy" | "medium" | "hard";
+  language?: string;   // code_review: javascript, python, java / practical_coding: java, python, c_cpp, javascript, rust, go, kotlin, typescript
   title: string;
   prompt: string;
   diff: string;
@@ -1259,6 +1260,7 @@ export const CATEGORIES: CategoryMeta[] = [
       { id: "performance_review", label: "Performance Review", description: "Spot performance regressions, memory issues, contract changes" },
       { id: "logic_review", label: "Logic Review", description: "Identify race conditions, edge cases, correctness bugs" },
       { id: "api_review", label: "API Review", description: "Review API design, error handling, observability" },
+      { id: "error_handling", label: "Error Handling", description: "Review exception handling, resource cleanup, failure recovery" },
     ],
   },
   {

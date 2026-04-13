@@ -203,7 +203,9 @@ When judging each criterion, use this decision tree:
 
 **"missing"**: The answer makes NO mention of this topic area whatsoever. The candidate shows zero awareness of this dimension.
 
-**Decision rule: "missing" should be RARE.** If the candidate wrote more than 2 sentences and the topic is related to the problem at hand, at least one criterion should likely get "partial". Only use "missing" when the answer truly does not touch this dimension at all.
+**Decision rule: "missing" should be RARE for substantive answers.** If the candidate wrote more than 2 sentences of TECHNICAL content related to the problem, at least one criterion should likely get "partial". Only use "missing" when the answer truly does not touch this dimension at all.
+
+**EXCEPTION: Off-topic or garbage answers.** If the answer contains NO technical content relevant to the problem (e.g., "test", "hello", random text, copy-pasted instructions, or empty/placeholder content), ALL criteria MUST be "missing" and the score MUST be 0-5. Do NOT give partial credit for non-answers.
 
 ## Scoring Guide
 

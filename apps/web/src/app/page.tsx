@@ -7,6 +7,8 @@ import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { UserButton } from "@/components/user-button";
+import { MobileNav } from "@/components/mobile-nav";
+import { warmUpApi } from "@/lib/api";
 import {
   ArrowRightIcon,
   BrainCircuitIcon,
@@ -60,36 +62,42 @@ const scenarioCards = [
     label: "Code Review",
     desc: "Read a diff, find the bugs, explain the risk",
     tag: "LIVE",
+    href: "/practice/code_review",
   },
   {
     icon: LayoutDashboardIcon,
     label: "System Design",
     desc: "Architect a system, defend your tradeoffs",
     tag: "LIVE",
+    href: "/practice/system_design",
   },
   {
     icon: TerminalIcon,
     label: "Debugging",
     desc: "Read logs, trace the root cause, propose a fix",
     tag: "LIVE",
+    href: "/practice/debugging",
   },
   {
     icon: TableIcon,
     label: "Data Analysis",
     desc: "SQL queries, pipelines, dimensional modeling",
     tag: "LIVE",
+    href: "/practice/data_analysis",
   },
   {
     icon: SearchIcon,
     label: "Practical Coding",
     desc: "Implement real systems in Python, Java, Rust, Go, and more",
     tag: "LIVE",
+    href: "/practice/practical_coding",
   },
   {
     icon: BrainCircuitIcon,
     label: "More coming",
     desc: "Excel, PowerBI, incident response, capacity planning",
     tag: "",
+    href: "",
   },
 ];
 
@@ -144,6 +152,9 @@ export default function LandingPage() {
   const skillsRef = useScrollReveal();
   const evalRef = useScrollReveal();
 
+  // Wake up API server on landing page load (mitigates Render free-tier cold start)
+  useEffect(() => { warmUpApi(); }, []);
+
   return (
     <div className="min-h-dvh flex flex-col">
       {/* Nav */}
@@ -160,12 +171,13 @@ export default function LandingPage() {
           <div className="flex items-center gap-2">
             <ThemeToggle />
             <UserButton />
-            <Link href="/practice">
+            <Link href="/practice" className="hidden md:inline-flex">
               <Button size="sm">
                 Start practicing
                 <ArrowRightIcon className="size-3.5 ml-1" />
               </Button>
             </Link>
+            <MobileNav />
           </div>
         </div>
       </nav>
@@ -229,37 +241,43 @@ export default function LandingPage() {
             </p>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-            {scenarioCards.map((item, i) => (
-              <div
-                key={item.label}
-                className="scroll-reveal card-glow group flex items-start gap-4 p-5 rounded-xl"
-              >
-                <div className="size-9 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
-                  <item.icon className="size-4 text-primary" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2">
-                    <p className="text-sm font-medium text-foreground">
-                      {item.label}
-                    </p>
-                    {item.tag && (
-                      <span
-                        className={`text-[9px] font-mono font-bold tracking-wider px-1.5 py-0.5 rounded ${
-                          item.tag === "LIVE"
-                            ? "bg-diff-add/15 text-diff-add-fg"
-                            : "bg-muted text-muted-foreground"
-                        }`}
-                      >
-                        {item.tag}
-                      </span>
-                    )}
+            {scenarioCards.map((item) => {
+              const inner = (
+                <div
+                  className="scroll-reveal card-glow group flex items-start gap-4 p-5 rounded-xl cursor-pointer"
+                >
+                  <div className="size-9 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+                    <item.icon className="size-4 text-primary" />
                   </div>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    {item.desc}
-                  </p>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <p className="text-sm font-medium text-foreground group-hover:text-primary transition-colors">
+                        {item.label}
+                      </p>
+                      {item.tag && (
+                        <span
+                          className={`text-[9px] font-mono font-bold tracking-wider px-1.5 py-0.5 rounded ${
+                            item.tag === "LIVE"
+                              ? "bg-diff-add/15 text-diff-add-fg"
+                              : "bg-muted text-muted-foreground"
+                          }`}
+                        >
+                          {item.tag}
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {item.desc}
+                    </p>
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+              return item.href ? (
+                <Link key={item.label} href={item.href}>{inner}</Link>
+              ) : (
+                <div key={item.label}>{inner}</div>
+              );
+            })}
           </div>
         </div>
       </section>

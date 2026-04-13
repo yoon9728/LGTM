@@ -1,6 +1,5 @@
 import { Hono } from "hono";
 import { db, type Answer } from "../data/store.js";
-import * as questions from "../data/questions.js";
 import { evaluate } from "../services/evaluation.js";
 import { optionalAuth } from "../middleware/auth.js";
 import { getRubric } from "../services/rubric-store.js";
@@ -156,7 +155,7 @@ export const answerRoutes = new Hono()
     if (body.sessionId) await db.sessions.updateStatus(body.sessionId, "answer_submitted");
 
     // Get question and resolve rubric (cached AI-generated, or generates on first use)
-    let question = questions.getById(answer.questionId);
+    let question = await db.questions.getById(answer.questionId);
     if (question) {
       const rubric = await getRubric(question);
       question = { ...question, rubric };

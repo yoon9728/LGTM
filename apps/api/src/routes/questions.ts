@@ -1,6 +1,6 @@
 import { Hono } from "hono";
-import * as questions from "../data/questions.js";
 import { db } from "../data/store.js";
+import { CATEGORIES, LANGUAGES } from "../data/questions.js";
 import { optionalAuth, type AuthUser } from "../middleware/auth.js";
 
 export const questionRoutes = new Hono()
@@ -13,16 +13,12 @@ export const questionRoutes = new Hono()
     const typeFilter = c.req.query("type");
     const languageFilter = c.req.query("language");
 
-    let allQuestions = isGuest ? questions.getGuestQuestions() : questions.getAll();
-    if (categoryFilter) {
-      allQuestions = allQuestions.filter((q) => q.category === categoryFilter);
-    }
-    if (typeFilter) {
-      allQuestions = allQuestions.filter((q) => q.type === typeFilter);
-    }
-    if (languageFilter) {
-      allQuestions = allQuestions.filter((q) => q.language === languageFilter);
-    }
+    const allQuestions = await db.questions.getFiltered({
+      category: categoryFilter,
+      type: typeFilter,
+      language: languageFilter,
+      guestOnly: isGuest,
+    });
 
     // Get best scores per question if authenticated
     let bestScores = new Map<string, number>();
@@ -34,6 +30,7 @@ export const questionRoutes = new Hono()
       id: q.id,
       category: q.category,
       type: q.type,
+      difficulty: q.difficulty ?? null,
       language: q.language ?? null,
       title: q.title,
       prompt: q.prompt,
@@ -77,13 +74,13 @@ export const questionRoutes = new Hono()
   .get("/meta", (c) => {
     return c.json({
       ok: true,
-      categories: questions.CATEGORIES,
-      languages: questions.LANGUAGES,
+      categories: CATEGORIES,
+      languages: LANGUAGES,
     });
   })
 
-  .get("/:id", (c) => {
-    const q = questions.getById(c.req.param("id"));
+  .get("/:id", async (c) => {
+    const q = await db.questions.getById(c.req.param("id"));
     if (!q) return c.json({ error: "Question not found" }, 404);
     // Strip rubric to prevent answer gaming
     const { rubric: _rubric, ...safeQuestion } = q;

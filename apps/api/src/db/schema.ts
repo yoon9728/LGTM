@@ -63,15 +63,20 @@ export const questions = pgTable("questions", {
   id: text("id").primaryKey(),
   category: text("category").notNull().default("code_review"),
   type: text("type").notNull(),
-  language: text("language"), // for practical_coding questions
+  language: text("language"),
+  difficulty: text("difficulty").default("medium"),
   title: text("title").notNull(),
   prompt: text("prompt").notNull(),
-  diff: text("diff").notNull(),
+  diff: text("diff").notNull().default(""),
   rubric: jsonb("rubric").notNull(), // { mustCover, strongSignals, weakPatterns }
-  difficulty: text("difficulty").default("medium"),
+  templates: jsonb("templates"), // practical_coding: { python: "...", java: "...", ... }
+  guest: boolean("guest").notNull().default(false),
   tags: jsonb("tags").default([]),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
-});
+}, (t) => [
+  index("idx_questions_cat_type_lang_diff").on(t.category, t.type, t.language, t.difficulty),
+  index("idx_questions_category").on(t.category),
+]);
 
 // ── Sessions ───────────────────────────────────────────
 export const sessions = pgTable("sessions", {

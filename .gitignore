@@ -5,3 +5,7 @@ CLAUDE.md
 .claude/
 screenshots/
 **/scripts/
+
+# Question import files (private — never commit)
+*.questions.json
+questions-import/

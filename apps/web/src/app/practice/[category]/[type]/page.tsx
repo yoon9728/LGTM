@@ -12,9 +12,10 @@ import { api } from "@/lib/api";
 import type { QuestionListItem, CategoryMeta, CategoryStats } from "@/lib/api";
 import { useScrollReveal } from "@/hooks/useScrollReveal";
 import { GUEST_LIMIT, GUEST_STORAGE_KEY } from "@/lib/guest";
+import { LoadingSpinner, LoadingDots } from "@/components/loading-spinner";
+import { MobileNav } from "@/components/mobile-nav";
 import {
   ArrowLeftIcon,
-  Loader2Icon,
   LockIcon,
   HistoryIcon,
   ShuffleIcon,
@@ -88,7 +89,7 @@ export default function TypeQuestionsPage({
   if (loading && !catMeta) {
     return (
       <div className="flex items-center justify-center min-h-dvh">
-        <Loader2Icon className="size-6 animate-spin text-muted-foreground" />
+        <LoadingSpinner size="lg" />
       </div>
     );
   }
@@ -138,6 +139,7 @@ export default function TypeQuestionsPage({
           )}
           <ThemeToggle />
           <UserButton />
+          <MobileNav />
         </div>
       </header>
 
@@ -182,7 +184,7 @@ export default function TypeQuestionsPage({
           {/* Random Button */}
           <Button onClick={() => startSession()} disabled={starting} className="w-full sm:w-auto">
             {starting ? (
-              <Loader2Icon className="size-4 animate-spin" />
+              <LoadingDots />
             ) : (
               <>
                 <ShuffleIcon className="size-4 mr-2" />

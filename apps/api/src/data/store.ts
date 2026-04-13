@@ -58,20 +58,26 @@ function toQuestion(qRow: {
   category: string;
   type: string;
   language: string | null;
+  difficulty: string | null;
   title: string;
   prompt: string;
   diff: string;
   rubric: unknown;
+  templates: unknown;
+  guest: boolean;
 }): Question {
   return {
     id: qRow.id,
     category: qRow.category,
     type: qRow.type,
     ...(qRow.language ? { language: qRow.language } : {}),
+    ...(qRow.difficulty ? { difficulty: qRow.difficulty as Question["difficulty"] } : {}),
     title: qRow.title,
     prompt: qRow.prompt,
     diff: qRow.diff,
     rubric: qRow.rubric as Question["rubric"],
+    ...(qRow.templates ? { templates: qRow.templates as Record<string, string> } : {}),
+    ...(qRow.guest ? { guest: true } : {}),
   };
 }
 
@@ -150,6 +156,81 @@ function toEvaluation(row: {
 // ── DB access layer (async, backed by Neon Postgres) ──
 
 export const db = {
+  questions: {
+    async getAll(): Promise<Question[]> {
+      const rows = await getPgDb()
+        .select()
+        .from(questionsTable)
+        .orderBy(questionsTable.category, questionsTable.type);
+      return rows.map(toQuestion);
+    },
+    async getById(id: string): Promise<Question | undefined> {
+      const [row] = await getPgDb()
+        .select()
+        .from(questionsTable)
+        .where(eq(questionsTable.id, id));
+      return row ? toQuestion(row) : undefined;
+    },
+    async getByCategory(
+      category: string,
+      type?: string,
+      language?: string,
+    ): Promise<Question[]> {
+      const conditions = [eq(questionsTable.category, category)];
+      if (type) conditions.push(eq(questionsTable.type, type));
+      if (language) conditions.push(eq(questionsTable.language, language));
+      const rows = await getPgDb()
+        .select()
+        .from(questionsTable)
+        .where(and(...conditions));
+      return rows.map(toQuestion);
+    },
+    async getGuestQuestions(): Promise<Question[]> {
+      const rows = await getPgDb()
+        .select()
+        .from(questionsTable)
+        .where(eq(questionsTable.guest, true));
+      return rows.map(toQuestion);
+    },
+    async getFiltered(opts: {
+      category?: string;
+      type?: string;
+      language?: string;
+      guestOnly?: boolean;
+    }): Promise<Question[]> {
+      const conditions = [];
+      if (opts.category) conditions.push(eq(questionsTable.category, opts.category));
+      if (opts.type) conditions.push(eq(questionsTable.type, opts.type));
+      if (opts.language) conditions.push(eq(questionsTable.language, opts.language));
+      if (opts.guestOnly) conditions.push(eq(questionsTable.guest, true));
+      const rows = await getPgDb()
+        .select()
+        .from(questionsTable)
+        .where(conditions.length > 0 ? and(...conditions) : undefined)
+        .orderBy(questionsTable.category, questionsTable.type);
+      return rows.map(toQuestion);
+    },
+    async getRandom(opts?: {
+      category?: string;
+      type?: string;
+      language?: string;
+      guestOnly?: boolean;
+    }): Promise<Question | undefined> {
+      const conditions = [];
+      if (opts?.category) conditions.push(eq(questionsTable.category, opts.category));
+      if (opts?.type) conditions.push(eq(questionsTable.type, opts.type));
+      if (opts?.language) conditions.push(eq(questionsTable.language, opts.language));
+      if (opts?.guestOnly) conditions.push(eq(questionsTable.guest, true));
+      const [row] = await getPgDb()
+        .select()
+        .from(questionsTable)
+        .where(conditions.length > 0 ? and(...conditions) : undefined)
+        .orderBy(sql`RANDOM()`)
+        .limit(1);
+      return row ? toQuestion(row) : undefined;
+    },
+  },
+
   sessions: {
     async insert(s: Session): Promise<Session> {
       const [row] = await getPgDb()
