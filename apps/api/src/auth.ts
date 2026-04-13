@@ -27,9 +27,9 @@ export function getAuth() {
             },
           }
         : {}),
-      trustedOrigins: [
-        process.env.WEB_ORIGIN ?? "http://localhost:4173",
-      ],
+      trustedOrigins: (process.env.WEB_ORIGIN ?? "http://localhost:4173")
+        .split(",")
+        .map((o) => o.trim()),
     });
   }
   return _auth;

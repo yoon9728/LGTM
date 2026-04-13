@@ -36,8 +36,12 @@ const app = new Hono();
 // Global body size limit — 512KB (prevents OOM from oversized payloads)
 app.use("*", bodyLimit({ maxSize: 512 * 1024 }));
 
+const allowedOrigins = (process.env.WEB_ORIGIN ?? "http://localhost:4173")
+  .split(",")
+  .map((o) => o.trim());
+
 app.use("*", cors({
-  origin: process.env.WEB_ORIGIN ?? "http://localhost:4173",
+  origin: allowedOrigins,
   allowMethods: ["GET", "POST", "PATCH", "OPTIONS"],
   allowHeaders: ["Content-Type"],
   credentials: true,
