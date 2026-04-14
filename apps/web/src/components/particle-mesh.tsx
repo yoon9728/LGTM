@@ -65,14 +65,17 @@ export function ParticleMesh({ className }: { className?: string }) {
     let disposed = false;
     let colors = getColors();
 
-    // ── Config ──
-    const PARTICLE_COUNT = 90;
-    const CONNECTION_DIST = 140;
-    const MOUSE_RADIUS = 260;
+    // Detect mobile/touch device
+    const isMobile = "ontouchstart" in window || navigator.maxTouchPoints > 0;
+
+    // ── Config (reduce on mobile) ──
+    const PARTICLE_COUNT = isMobile ? 45 : 90;
+    const CONNECTION_DIST = isMobile ? 110 : 140;
+    const MOUSE_RADIUS = isMobile ? 0 : 260;    // no hover effect on mobile
     const MOUSE_REPEL = 0.35;
     const BASE_SPEED = 0.25;
-    const GRAB_RADIUS = 60;         // how close to grab a particle
-    const MAX_STRETCH = 120;        // max drag stretch distance
+    const GRAB_RADIUS = 60;
+    const MAX_STRETCH = 120;
 
     // ── State ──
     let w = 0;
@@ -381,11 +384,13 @@ export function ParticleMesh({ className }: { className?: string }) {
     resize();
     createParticles();
 
-    // Use document-level listeners so events pass through z-indexed overlays
-    document.addEventListener("mousemove", onMouseMove);
-    document.addEventListener("mouseleave", onMouseLeave);
-    document.addEventListener("pointerdown", onPointerDown);
-    document.addEventListener("pointerup", onPointerUp);
+    // Desktop only: mouse/pointer interactions (mobile gets ambient animation only)
+    if (!isMobile) {
+      document.addEventListener("mousemove", onMouseMove);
+      document.addEventListener("mouseleave", onMouseLeave);
+      document.addEventListener("pointerdown", onPointerDown);
+      document.addEventListener("pointerup", onPointerUp);
+    }
 
     const onResize = () => {
       resize();
@@ -402,10 +407,12 @@ export function ParticleMesh({ className }: { className?: string }) {
       disposed = true;
       cancelAnimationFrame(animId);
       observer.disconnect();
-      document.removeEventListener("mousemove", onMouseMove);
-      document.removeEventListener("mouseleave", onMouseLeave);
-      document.removeEventListener("pointerdown", onPointerDown);
-      document.removeEventListener("pointerup", onPointerUp);
+      if (!isMobile) {
+        document.removeEventListener("mousemove", onMouseMove);
+        document.removeEventListener("mouseleave", onMouseLeave);
+        document.removeEventListener("pointerdown", onPointerDown);
+        document.removeEventListener("pointerup", onPointerUp);
+      }
       window.removeEventListener("resize", onResize);
     };
   }, []);
