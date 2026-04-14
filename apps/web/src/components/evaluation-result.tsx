@@ -39,12 +39,17 @@ function scoreLabel(score: number, band: string) {
 
 const isLgtm = (score: number) => score === 100;
 
-function GuestLockOverlay() {
+function GuestLockedContent({ children }: { children: React.ReactNode }) {
   return (
-    <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-2 backdrop-blur-[6px] rounded-lg">
-      <LockIcon className="size-4 text-muted-foreground" />
-      <p className="text-xs text-muted-foreground font-medium">Sign up to unlock</p>
-    </div>
+    <CardContent className="relative overflow-hidden">
+      <div className="select-none" aria-hidden>
+        {children}
+      </div>
+      <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-1.5 backdrop-blur-[6px]">
+        <LockIcon className="size-4 text-muted-foreground" />
+        <p className="text-xs text-muted-foreground font-medium">Sign up to unlock</p>
+      </div>
+    </CardContent>
   );
 }
 
@@ -228,62 +233,53 @@ export function EvaluationResult({ evaluation, isGuest = false }: EvaluationResu
       {isGuest ? (
         <div className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <Card className="relative overflow-hidden">
+            <Card>
               <CardHeader className="pb-3">
                 <CardTitle className="flex items-center gap-2 text-sm font-medium tracking-wide uppercase">
                   <CheckIcon className="size-4 text-primary" />
                   Strengths
                 </CardTitle>
               </CardHeader>
-              <CardContent>
-                <ul className="space-y-2.5">
+              <GuestLockedContent>
+                <ul className="space-y-2.5 text-muted-foreground/20 blur-[5px]">
                   {(evaluation.strengths.length > 0 ? evaluation.strengths : ["No strengths identified"]).map((s, i) => (
-                    <li key={i} className="text-sm leading-relaxed text-muted-foreground/20 select-none blur-[5px]" aria-hidden>
-                      {s}
-                    </li>
+                    <li key={i} className="text-sm leading-relaxed">{s}</li>
                   ))}
                 </ul>
-              </CardContent>
-              <GuestLockOverlay />
+              </GuestLockedContent>
             </Card>
-            <Card className="relative overflow-hidden">
+            <Card>
               <CardHeader className="pb-3">
                 <CardTitle className="flex items-center gap-2 text-sm font-medium tracking-wide uppercase text-muted-foreground">
                   <XIcon className="size-4" />
                   Weaknesses
                 </CardTitle>
               </CardHeader>
-              <CardContent>
-                <ul className="space-y-2.5">
+              <GuestLockedContent>
+                <ul className="space-y-2.5 text-muted-foreground/20 blur-[5px]">
                   {(evaluation.weaknesses.length > 0 ? evaluation.weaknesses : ["No weaknesses identified"]).map((w, i) => (
-                    <li key={i} className="text-sm leading-relaxed text-muted-foreground/20 select-none blur-[5px]" aria-hidden>
-                      {w}
-                    </li>
+                    <li key={i} className="text-sm leading-relaxed">{w}</li>
                   ))}
                 </ul>
-              </CardContent>
-              <GuestLockOverlay />
+              </GuestLockedContent>
             </Card>
           </div>
 
           {evaluation.nextSteps?.length > 0 && (
-            <Card className="relative overflow-hidden">
+            <Card>
               <CardHeader className="pb-3">
                 <CardTitle className="flex items-center gap-2 text-sm font-medium tracking-wide uppercase text-muted-foreground">
                   <ArrowRightIcon className="size-4" />
                   Next Steps
                 </CardTitle>
               </CardHeader>
-              <CardContent>
-                <ul className="space-y-2.5">
+              <GuestLockedContent>
+                <ul className="space-y-2.5 text-muted-foreground/20 blur-[5px]">
                   {evaluation.nextSteps.map((step, i) => (
-                    <li key={i} className="text-sm leading-relaxed text-muted-foreground/20 select-none blur-[5px]" aria-hidden>
-                      {step}
-                    </li>
+                    <li key={i} className="text-sm leading-relaxed">{step}</li>
                   ))}
                 </ul>
-              </CardContent>
-              <GuestLockOverlay />
+              </GuestLockedContent>
             </Card>
           )}
 
