@@ -116,6 +116,7 @@ export interface StatsOverview {
   streak: number;
   totalQuestions: number;
   solvedQuestions: number;
+  lgtmCount: number;
 }
 
 export interface CategoryStat {

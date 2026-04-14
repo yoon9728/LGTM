@@ -26,11 +26,14 @@ function scoreBand(score: number) {
 }
 
 function scoreLabel(score: number, band: string) {
+  if (score === 100) return "LGTM";
   if (score === 0) return "Not scored";
   if (band === "high") return "Strong";
   if (band === "mid") return "Developing";
   return "Needs work";
 }
+
+const isLgtm = (score: number) => score === 100;
 
 export function EvaluationResult({ evaluation }: EvaluationResultProps) {
   const score = evaluation.score ?? 0;
@@ -46,35 +49,49 @@ export function EvaluationResult({ evaluation }: EvaluationResultProps) {
     <div className="space-y-6">
       {/* Score */}
       <div className="space-y-4">
-        <div className="flex items-baseline gap-3">
-          <span
-            className={cn(
-              "text-5xl font-bold tracking-tight font-mono",
-              band === "high" && "text-primary",
-              band === "mid" && "text-foreground",
-              band === "low" && score === 0 ? "text-destructive" : "text-muted-foreground"
-            )}
-          >
-            {score}
-          </span>
-          <span className="text-lg text-muted-foreground">/ 100</span>
-          <span
-            className={cn(
-              "text-xs font-medium px-2 py-0.5 rounded-full ml-1",
-              band === "high" && "bg-primary/10 text-primary",
-              band === "mid" && "bg-foreground/10 text-foreground",
-              band === "low" && score === 0
-                ? "bg-destructive/10 text-destructive"
-                : "bg-muted text-muted-foreground"
-            )}
-          >
-            {scoreLabel(score, band)}
-          </span>
-        </div>
-        <Progress
-          value={score}
-          className={cn("h-1.5", score === 0 && "[&>div]:bg-destructive")}
-        />
+        {isLgtm(score) ? (
+          <div className="text-center py-4 space-y-2">
+            <p className="text-5xl font-black tracking-tight text-primary font-mono">
+              LGTM
+            </p>
+            <p className="text-sm text-muted-foreground">
+              Perfect score — nothing to improve
+            </p>
+            <Progress value={100} className="h-1.5" />
+          </div>
+        ) : (
+          <>
+            <div className="flex items-baseline gap-3">
+              <span
+                className={cn(
+                  "text-5xl font-bold tracking-tight font-mono",
+                  band === "high" && "text-primary",
+                  band === "mid" && "text-foreground",
+                  band === "low" && score === 0 ? "text-destructive" : "text-muted-foreground"
+                )}
+              >
+                {score}
+              </span>
+              <span className="text-lg text-muted-foreground">/ 100</span>
+              <span
+                className={cn(
+                  "text-xs font-medium px-2 py-0.5 rounded-full ml-1",
+                  band === "high" && "bg-primary/10 text-primary",
+                  band === "mid" && "bg-foreground/10 text-foreground",
+                  band === "low" && score === 0
+                    ? "bg-destructive/10 text-destructive"
+                    : "bg-muted text-muted-foreground"
+                )}
+              >
+                {scoreLabel(score, band)}
+              </span>
+            </div>
+            <Progress
+              value={score}
+              className={cn("h-1.5", score === 0 && "[&>div]:bg-destructive")}
+            />
+          </>
+        )}
       </div>
 
       {/* Reason */}

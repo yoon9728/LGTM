@@ -7,8 +7,6 @@ function normalizeScore(score: unknown): number | null {
   let s = score;
   if (s >= 0 && s <= 1) s = Math.round(s * 100);
   s = Math.max(0, Math.min(100, Math.round(s)));
-  // Round 95+ to 100 — near-perfect answers should not be penalized for minor nitpicks
-  if (s >= 95) s = 100;
   return s;
 }
 

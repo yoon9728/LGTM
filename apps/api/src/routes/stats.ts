@@ -141,7 +141,23 @@ export const statsRoutes = new Hono()
 
     const solvedCount = solvedQuestions.filter((q) => (q.bestScore ?? 0) >= 90).length;
 
-    // 8. Weakest category (lowest avg score with at least 1 session)
+    // 8. LGTM count (sessions with score = 100)
+    const [lgtmResult] = await db
+      .select({
+        count: sql<number>`COUNT(DISTINCT ${sessionsTable.id})`.as("lgtm_count"),
+      })
+      .from(sessionsTable)
+      .innerJoin(answersTable, eq(answersTable.sessionId, sessionsTable.id))
+      .innerJoin(evaluationsTable, and(
+        eq(evaluationsTable.answerId, answersTable.id),
+        eq(evaluationsTable.status, "completed"),
+      ))
+      .where(and(
+        eq(sessionsTable.userId, user.id),
+        sql`${evaluationsTable.score} = 100`,
+      ));
+
+    // 9. Weakest category (lowest avg score with at least 1 session)
     const scoredCategories = categoryStats.filter((c) => c.avgScore != null);
     const weakestCategory = scoredCategories.length > 0
       ? scoredCategories.reduce((min, c) => (c.avgScore! < min.avgScore! ? c : min))
@@ -157,6 +173,7 @@ export const statsRoutes = new Hono()
           streak,
           totalQuestions: questionCounts?.total ?? 0,
           solvedQuestions: solvedCount,
+          lgtmCount: lgtmResult?.count ?? 0,
         },
         categoryStats: categoryStats.map((r) => ({
           category: r.category,

@@ -222,7 +222,7 @@ export default function HistoryPage() {
                   <span
                     className={`text-sm font-mono font-bold ${scoreColor(entry.score)}`}
                   >
-                    {entry.score ?? "—"}
+                    {entry.score === 100 ? "LGTM" : (entry.score ?? "—")}
                   </span>
                   <span className="text-xs text-muted-foreground">
                     {new Date(entry.createdAt).toLocaleDateString()}

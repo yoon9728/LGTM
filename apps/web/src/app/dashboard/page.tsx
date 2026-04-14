@@ -199,18 +199,16 @@ export default function DashboardPage() {
             )}
           </Card>
 
-          {/* Best Score */}
+          {/* LGTM Count */}
           <Card className="p-5 space-y-2">
             <div className="flex items-center gap-2 text-muted-foreground">
               <TrophyIcon className="size-4" />
-              <span className="text-xs font-medium uppercase tracking-wide">Best Score</span>
+              <span className="text-xs font-medium uppercase tracking-wide">LGTM</span>
             </div>
-            <p className="text-3xl font-bold font-mono">
-              {categoryStats.length > 0
-                ? Math.max(...categoryStats.map((c) => c.bestScore ?? 0))
-                : "—"}
+            <p className="text-3xl font-bold font-mono text-primary">
+              {overview.lgtmCount}
             </p>
-            <p className="text-[10px] text-muted-foreground">personal record</p>
+            <p className="text-[10px] text-muted-foreground">perfect scores achieved</p>
           </Card>
         </div>
 
@@ -367,7 +365,7 @@ export default function DashboardPage() {
                         <span className={`text-sm font-mono font-bold ${
                           s.score >= 80 ? "text-diff-add-fg" : s.score >= 50 ? "text-yellow-500" : "text-diff-remove-fg"
                         }`}>
-                          {s.score}
+                          {s.score === 100 ? "LGTM" : s.score}
                         </span>
                       ) : (
                         <span className="text-xs text-muted-foreground">—</span>

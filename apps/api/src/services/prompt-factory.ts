@@ -222,6 +222,8 @@ When judging each criterion, use this decision tree:
 | 5 covered | Expert | 85-92 |
 | 5 covered + strongSignals present | Expert+ | 92-100 |
 
+**100 (LGTM — perfect score):** Reserve 100 for answers where ALL mustCover criteria are "covered", strongSignals are present, AND there is genuinely nothing meaningful to improve. If you score 100, nextSteps MUST be an empty array []. A score of 100 means "this review is production-ready, no notes."
+
 **STEP 2: Place the score within the range based on quality.**
 - Top of range: clear reasoning, actionable advice, well-structured
 - Bottom of range: correct but shallow, weak explanations, weakPatterns present
@@ -240,7 +242,7 @@ Return strict JSON with these keys:
 - score: number (0-100 integer)
 - strengths: string[] (what the candidate did well, referencing specific parts of their answer)
 - weaknesses: string[] (what was missed or weak, be specific and actionable)
-- nextSteps: string[] (concrete advice for improvement)
+- nextSteps: string[] (concrete advice for improvement. If the answer is truly perfect with nothing to improve, return an empty array [])
 - rationale: string (1-2 sentence overall assessment)
 - criteriaResults: array of objects, one per mustCover item, each with:
   - criterion: string (the mustCover text)
@@ -249,7 +251,8 @@ Return strict JSON with these keys:
 
 ## SELF-CHECK (do this before finalizing your response)
 Count your "covered" and "partial" results, then verify your score falls in the correct range from the table above:
-- 5 covered + strongSignals → 92-100
+- 5 covered + strongSignals + nothing to improve → 100 (LGTM, nextSteps must be [])
+- 5 covered + strongSignals → 92-99
 - 5 covered → 85-92
 - 3-4 covered → 68-85
 - 2 covered + partials → 52-68

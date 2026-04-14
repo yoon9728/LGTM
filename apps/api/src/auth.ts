@@ -11,6 +11,9 @@ export function getAuth() {
     const googleSecret = process.env.GOOGLE_CLIENT_SECRET;
 
     const isProduction = process.env.NODE_ENV === "production";
+    const webOrigins = (process.env.WEB_ORIGIN ?? "http://localhost:4173")
+      .split(",")
+      .map((o) => o.trim());
 
     _auth = betterAuth({
       baseURL: process.env.BETTER_AUTH_URL,
@@ -30,9 +33,7 @@ export function getAuth() {
             },
           }
         : {}),
-      trustedOrigins: (process.env.WEB_ORIGIN ?? "http://localhost:4173")
-        .split(",")
-        .map((o) => o.trim()),
+      trustedOrigins: webOrigins,
       advanced: {
         crossSubDomainCookies: {
           enabled: false,
