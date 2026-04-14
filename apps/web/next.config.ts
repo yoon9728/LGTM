@@ -1,19 +1,7 @@
 import type { NextConfig } from "next";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4300";
-
 const nextConfig: NextConfig = {
   output: "standalone",
-  async rewrites() {
-    return [
-      {
-        // Proxy auth requests through the web domain so cookies are first-party
-        // Fixes mobile browsers blocking cross-site cookies on OAuth flow
-        source: "/api/auth/:path*",
-        destination: `${API_URL}/api/auth/:path*`,
-      },
-    ];
-  },
   async headers() {
     return [
       {

@@ -127,6 +127,7 @@ export default function TypeQuestionsPage({
     );
   }
 
+  const isGuestPreview = !isAuthenticated && !isPending;
   const displayLabel = typeMeta.label;
 
   return (
@@ -432,6 +433,27 @@ export default function TypeQuestionsPage({
                   </>
                 );
               })()}
+
+              {/* Guest teaser — more questions available */}
+              {isGuestPreview && (
+                <div className="rounded-lg border border-border border-dashed p-6 text-center space-y-3">
+                  <div className="flex items-center justify-center gap-2 text-muted-foreground">
+                    <LockIcon className="size-4" />
+                    <span className="text-sm font-semibold">100+ more questions</span>
+                  </div>
+                  <p className="text-xs text-muted-foreground leading-relaxed max-w-sm mx-auto">
+                    Sign up to access the full question bank across all difficulty levels.
+                  </p>
+                  <div className="flex gap-2 justify-center pt-1">
+                    <Link href="/sign-up">
+                      <Button size="sm">Create free account</Button>
+                    </Link>
+                    <Link href="/sign-in">
+                      <Button size="sm" variant="outline">Sign in</Button>
+                    </Link>
+                  </div>
+                </div>
+              )}
             </>
           )}
         </section>
