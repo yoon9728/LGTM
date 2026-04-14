@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, use } from "react";
+import { useState, useEffect, useCallback, useMemo, use } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
@@ -10,7 +10,6 @@ import { UserButton } from "@/components/user-button";
 import { useSession } from "@/lib/auth-client";
 import { api } from "@/lib/api";
 import type { QuestionListItem, CategoryMeta, CategoryStats } from "@/lib/api";
-import { useScrollReveal } from "@/hooks/useScrollReveal";
 import { GUEST_LIMIT, GUEST_STORAGE_KEY } from "@/lib/guest";
 import { LoadingSpinner, LoadingDots } from "@/components/loading-spinner";
 import { MobileNav } from "@/components/mobile-nav";
@@ -20,6 +19,11 @@ import {
   HistoryIcon,
   ShuffleIcon,
   CheckCircle2Icon,
+  LayoutListIcon,
+  LayoutGridIcon,
+  ChevronLeftIcon,
+  ChevronRightIcon,
+  ArrowUpDownIcon,
 } from "lucide-react";
 
 export default function TypeQuestionsPage({
@@ -40,13 +44,31 @@ export default function TypeQuestionsPage({
   const [loading, setLoading] = useState(true);
   const [starting, setStarting] = useState(false);
   const [guestCompletions, setGuestCompletions] = useState(0);
+  const [viewMode, setViewMode] = useState<"list" | "card">("list");
+  const [sortBy, setSortBy] = useState<"default" | "easy-first" | "hard-first">("default");
+  const [pageSize, setPageSize] = useState(20);
+  const [currentPage, setCurrentPage] = useState(1);
 
   useEffect(() => {
     const stored = localStorage.getItem(GUEST_STORAGE_KEY);
     if (stored) setGuestCompletions(parseInt(stored) || 0);
   }, []);
 
+  useEffect(() => {
+    window.scrollTo({ top: 0 });
+  }, [currentPage]);
+
   const guestLimitReached = !isAuthenticated && !isPending && guestCompletions >= GUEST_LIMIT;
+
+  const sortedQuestions = useMemo(() => {
+    if (sortBy === "default") return questions;
+    const order = { easy: 0, medium: 1, hard: 2 };
+    return [...questions].sort((a, b) => {
+      const oa = a.difficulty ? order[a.difficulty] : 3;
+      const ob = b.difficulty ? order[b.difficulty] : 3;
+      return sortBy === "easy-first" ? oa - ob : ob - oa;
+    });
+  }, [questions, sortBy]);
 
   useEffect(() => {
     Promise.all([
@@ -84,7 +106,7 @@ export default function TypeQuestionsPage({
     }
   }, [category, type, router]);
 
-  const cardsRef = useScrollReveal([questions]);
+  // No scroll-reveal on paginated lists — items should be visible immediately
 
   if (loading && !catMeta) {
     return (
@@ -194,46 +216,223 @@ export default function TypeQuestionsPage({
           </Button>
 
           {/* Question Cards */}
-          {questions.length === 0 ? (
+          {sortedQuestions.length === 0 ? (
             <div className="text-center py-12">
               <p className="text-muted-foreground text-sm">No questions available yet.</p>
             </div>
           ) : (
-            <div className="grid gap-3" ref={cardsRef}>
-              {questions.map((q) => (
-                <button
-                  key={q.id}
-                  onClick={() => startSession(q.id)}
-                  disabled={starting}
-                  className="scroll-reveal card-glow group text-left rounded-lg px-5 py-4 w-full"
-                >
-                  <div className="flex items-start justify-between gap-4">
-                    <div className="min-w-0 space-y-1.5">
-                      <h3 className="text-sm font-semibold text-foreground group-hover:text-primary transition-colors">
-                        {q.title}
-                      </h3>
-                      <p className="text-xs text-muted-foreground leading-relaxed line-clamp-2">
-                        {q.prompt}
-                      </p>
-                    </div>
-                    <div className="flex items-center gap-2 shrink-0">
-                      {q.bestScore != null && (
-                        <span className={`text-sm font-mono font-bold ${
-                          q.bestScore >= 90 ? "text-primary" :
-                          q.bestScore >= 70 ? "text-foreground" :
-                          "text-muted-foreground"
-                        }`}>
-                          {q.bestScore}
-                        </span>
-                      )}
-                      {q.completed && (
-                        <CheckCircle2Icon className="size-4 text-primary" />
-                      )}
-                    </div>
+            <>
+              {/* View controls */}
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => { setViewMode("list"); setCurrentPage(1); }}
+                    className={`size-8 rounded-md flex items-center justify-center transition-colors ${
+                      viewMode === "list" ? "bg-primary text-primary-foreground" : "border border-border text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    <LayoutListIcon className="size-3.5" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { setViewMode("card"); setCurrentPage(1); }}
+                    className={`size-8 rounded-md flex items-center justify-center transition-colors ${
+                      viewMode === "card" ? "bg-primary text-primary-foreground" : "border border-border text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    <LayoutGridIcon className="size-3.5" />
+                  </button>
+                  <div className="w-px h-5 bg-border mx-1" />
+                  <button
+                    type="button"
+                    onClick={() => { setSortBy((s) => s === "default" ? "easy-first" : s === "easy-first" ? "hard-first" : "default"); setCurrentPage(1); }}
+                    className={`h-8 rounded-md flex items-center gap-1.5 px-2.5 text-[11px] font-medium transition-colors ${
+                      sortBy !== "default" ? "bg-primary text-primary-foreground" : "border border-border text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    <ArrowUpDownIcon className="size-3.5" />
+                    {sortBy === "easy-first" ? "Easy first" : sortBy === "hard-first" ? "Hard first" : "Difficulty"}
+                  </button>
+                </div>
+                {sortedQuestions.length > 20 && (
+                  <div className="flex items-center gap-1">
+                    {[20, 50, 100].map((size) => (
+                      <button
+                        key={size}
+                        type="button"
+                        onClick={() => { setPageSize(size); setCurrentPage(1); }}
+                        className={`text-[10px] font-mono px-2 py-1 rounded transition-colors ${
+                          pageSize === size
+                            ? "bg-primary text-primary-foreground"
+                            : "text-muted-foreground hover:text-foreground border border-border"
+                        }`}
+                      >
+                        {size}
+                      </button>
+                    ))}
                   </div>
-                </button>
-              ))}
-            </div>
+                )}
+              </div>
+
+              {/* List view */}
+              {viewMode === "list" && (() => {
+                const totalPages = Math.ceil(sortedQuestions.length / pageSize);
+                const start = (currentPage - 1) * pageSize;
+                const paged = sortedQuestions.slice(start, start + pageSize);
+                return (
+                  <>
+                    <div className="grid gap-3">
+                      {paged.map((q) => (
+                        <button
+                          key={q.id}
+                          onClick={() => startSession(q.id)}
+                          disabled={starting}
+                          className="card-glow group text-left rounded-lg px-5 py-4 w-full"
+                        >
+                          <div className="flex items-start justify-between gap-4">
+                            <div className="min-w-0 space-y-1.5">
+                              <div className="flex items-center gap-2">
+                                <h3 className="text-sm font-semibold text-foreground group-hover:text-primary transition-colors">
+                                  {q.title}
+                                </h3>
+                                {q.difficulty && (
+                                  <span className={`text-[10px] font-mono font-semibold tracking-wide uppercase px-1.5 py-0.5 rounded ${
+                                    q.difficulty === "easy" ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400" :
+                                    q.difficulty === "hard" ? "bg-rose-500/10 text-rose-600 dark:text-rose-400" :
+                                    "bg-amber-500/10 text-amber-600 dark:text-amber-400"
+                                  }`}>
+                                    {q.difficulty}
+                                  </span>
+                                )}
+                              </div>
+                              <p className="text-xs text-muted-foreground leading-relaxed line-clamp-2">
+                                {q.prompt}
+                              </p>
+                            </div>
+                            <div className="flex items-center gap-2 shrink-0">
+                              {q.bestScore != null && (
+                                <span className={`text-sm font-mono font-bold ${
+                                  q.bestScore >= 90 ? "text-primary" :
+                                  q.bestScore >= 70 ? "text-foreground" :
+                                  "text-muted-foreground"
+                                }`}>
+                                  {q.bestScore}
+                                </span>
+                              )}
+                              {q.completed && (
+                                <CheckCircle2Icon className="size-4 text-primary" />
+                              )}
+                            </div>
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                    {totalPages > 1 && (
+                      <div className="flex items-center justify-center gap-2 pt-2">
+                        <button
+                          type="button"
+                          onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                          disabled={currentPage === 1}
+                          className="size-8 rounded-md border border-border flex items-center justify-center hover:bg-accent transition-colors disabled:opacity-30"
+                        >
+                          <ChevronLeftIcon className="size-3.5" />
+                        </button>
+                        <span className="text-xs font-mono text-muted-foreground">
+                          {currentPage} / {totalPages}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                          disabled={currentPage === totalPages}
+                          className="size-8 rounded-md border border-border flex items-center justify-center hover:bg-accent transition-colors disabled:opacity-30"
+                        >
+                          <ChevronRightIcon className="size-3.5" />
+                        </button>
+                      </div>
+                    )}
+                  </>
+                );
+              })()}
+
+              {/* Card view — grid of cards */}
+              {viewMode === "card" && (() => {
+                const totalPages = Math.ceil(sortedQuestions.length / pageSize);
+                const start = (currentPage - 1) * pageSize;
+                const paged = sortedQuestions.slice(start, start + pageSize);
+                return (
+                  <>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      {paged.map((q) => (
+                        <button
+                          key={q.id}
+                          onClick={() => startSession(q.id)}
+                          disabled={starting}
+                          className="card-glow group text-left rounded-xl p-5 w-full space-y-3"
+                        >
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2 min-w-0">
+                              <h3 className="text-sm font-semibold text-foreground group-hover:text-primary transition-colors line-clamp-1">
+                                {q.title}
+                              </h3>
+                              {q.difficulty && (
+                                <span className={`text-[10px] font-mono font-semibold tracking-wide uppercase px-1.5 py-0.5 rounded shrink-0 ${
+                                  q.difficulty === "easy" ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400" :
+                                  q.difficulty === "hard" ? "bg-rose-500/10 text-rose-600 dark:text-rose-400" :
+                                  "bg-amber-500/10 text-amber-600 dark:text-amber-400"
+                                }`}>
+                                  {q.difficulty}
+                                </span>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-2 shrink-0 ml-2">
+                              {q.bestScore != null && (
+                                <span className={`text-sm font-mono font-bold ${
+                                  q.bestScore >= 90 ? "text-primary" :
+                                  q.bestScore >= 70 ? "text-foreground" :
+                                  "text-muted-foreground"
+                                }`}>
+                                  {q.bestScore}
+                                </span>
+                              )}
+                              {q.completed && (
+                                <CheckCircle2Icon className="size-4 text-primary" />
+                              )}
+                            </div>
+                          </div>
+                          <p className="text-xs text-muted-foreground leading-relaxed line-clamp-3">
+                            {q.prompt}
+                          </p>
+                        </button>
+                      ))}
+                    </div>
+                    {totalPages > 1 && (
+                      <div className="flex items-center justify-center gap-2 pt-2">
+                        <button
+                          type="button"
+                          onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                          disabled={currentPage === 1}
+                          className="size-8 rounded-md border border-border flex items-center justify-center hover:bg-accent transition-colors disabled:opacity-30"
+                        >
+                          <ChevronLeftIcon className="size-3.5" />
+                        </button>
+                        <span className="text-xs font-mono text-muted-foreground">
+                          {currentPage} / {totalPages}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                          disabled={currentPage === totalPages}
+                          className="size-8 rounded-md border border-border flex items-center justify-center hover:bg-accent transition-colors disabled:opacity-30"
+                        >
+                          <ChevronRightIcon className="size-3.5" />
+                        </button>
+                      </div>
+                    )}
+                  </>
+                );
+              })()}
+            </>
           )}
         </section>
       )}

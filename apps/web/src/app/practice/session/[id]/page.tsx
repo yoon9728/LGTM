@@ -336,6 +336,15 @@ export default function SessionPage({ params }: { params: Promise<{ id: string }
               {sessionLanguage === "c_cpp" ? "C/C++" : sessionLanguage.toUpperCase()}
             </span>
           )}
+          {session?.question.difficulty && (
+            <span className={`text-[10px] font-mono font-semibold tracking-wide uppercase px-1.5 py-0.5 rounded ${
+              session.question.difficulty === "easy" ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400" :
+              session.question.difficulty === "hard" ? "bg-rose-500/10 text-rose-600 dark:text-rose-400" :
+              "bg-amber-500/10 text-amber-600 dark:text-amber-400"
+            }`}>
+              {session.question.difficulty}
+            </span>
+          )}
         </div>
         <h2 className="text-xl font-semibold tracking-tight">{session?.question.title}</h2>
         <p className="text-sm text-muted-foreground leading-relaxed whitespace-pre-line">{session?.question.prompt}</p>

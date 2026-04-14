@@ -2,13 +2,13 @@
 
 import dynamic from "next/dynamic";
 import Link from "next/link";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { UserButton } from "@/components/user-button";
 import { MobileNav } from "@/components/mobile-nav";
-import { warmUpApi } from "@/lib/api";
+import { warmUpApi, api } from "@/lib/api";
 import {
   ArrowRightIcon,
   BrainCircuitIcon,
@@ -152,8 +152,16 @@ export default function LandingPage() {
   const skillsRef = useScrollReveal();
   const evalRef = useScrollReveal();
 
-  // Wake up API server on landing page load (mitigates Render free-tier cold start)
-  useEffect(() => { warmUpApi(); }, []);
+  const [landingStats, setLandingStats] = useState<{ categories: number; questions: number } | null>(null);
+
+  // Wake up API + fetch stats for landing page
+  useEffect(() => {
+    warmUpApi();
+    api.getQuestions().then((res) => {
+      const cats = new Set(res.questions.map((q) => q.category));
+      setLandingStats({ categories: cats.size, questions: res.questions.length });
+    }).catch(() => {});
+  }, []);
 
   return (
     <div className="min-h-dvh flex flex-col">
@@ -237,7 +245,9 @@ export default function LandingPage() {
               Multi-domain scenarios
             </p>
             <p className="scroll-reveal text-xs text-muted-foreground">
-              5 categories · 52 questions
+              {landingStats
+                ? `${landingStats.categories} categories · ${landingStats.questions} questions`
+                : "Loading..."}
             </p>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">

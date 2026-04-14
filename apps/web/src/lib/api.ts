@@ -27,6 +27,7 @@ export interface Question {
   id: string;
   category: string;
   type: string;
+  difficulty?: "easy" | "medium" | "hard";
   language?: string;
   title: string;
   prompt: string;
@@ -38,6 +39,7 @@ export interface QuestionListItem {
   id: string;
   category: string;
   type: string;
+  difficulty: "easy" | "medium" | "hard" | null;
   language: string | null;
   title: string;
   prompt: string;
