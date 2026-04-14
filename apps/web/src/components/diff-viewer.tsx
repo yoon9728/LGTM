@@ -62,7 +62,7 @@ export const DiffViewer = memo(function DiffViewer({ diff, filename }: DiffViewe
             </span>
             <code
               className={cn(
-                "flex-1 px-4 whitespace-pre",
+                "flex-1 px-4 whitespace-pre-wrap break-all md:whitespace-pre md:break-normal",
                 line.type === "add" && "text-diff-add-fg",
                 line.type === "remove" && "text-diff-remove-fg",
                 line.type === "meta" && "text-diff-meta",

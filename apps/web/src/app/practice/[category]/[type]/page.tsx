@@ -223,7 +223,7 @@ export default function TypeQuestionsPage({
           ) : (
             <>
               {/* View controls */}
-              <div className="flex items-center justify-between">
+              <div className="flex flex-wrap items-center gap-2 sm:gap-0 sm:justify-between">
                 <div className="flex items-center gap-1.5">
                   <button
                     type="button"
@@ -252,7 +252,7 @@ export default function TypeQuestionsPage({
                     }`}
                   >
                     <ArrowUpDownIcon className="size-3.5" />
-                    {sortBy === "easy-first" ? "Easy first" : sortBy === "hard-first" ? "Hard first" : "Difficulty"}
+                    <span className="hidden sm:inline">{sortBy === "easy-first" ? "Easy first" : sortBy === "hard-first" ? "Hard first" : "Difficulty"}</span>
                   </button>
                 </div>
                 {sortedQuestions.length > 20 && (
