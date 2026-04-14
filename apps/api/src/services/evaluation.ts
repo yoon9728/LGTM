@@ -77,8 +77,24 @@ async function callOpenAI(answer: Answer, question?: Question): Promise<Record<s
 }
 
 /**
+ * Determine the hard score ceiling based on criteria coverage pattern.
+ * Mirrors the scoring guide table in the prompt.
+ */
+function getScoreCeiling(covered: number, partial: number, missing: number, total: number): number {
+  if (covered === 0 && partial === 0) return 10;
+  if (covered === 0 && partial === 1) return 22;
+  if (covered === 0 && partial >= 2) return 38;
+  if (covered === 1) return 52;
+  if (covered === 2) return 68;
+  if (covered >= 3 && covered < total) return 85;
+  // All covered
+  return 100;
+}
+
+/**
  * Validate score against rubric coverage.
- * If the AI gave a score that's wildly inconsistent with criteria coverage, adjust it.
+ * Enforces the scoring guide table as a hard ceiling — the AI's score
+ * cannot exceed the maximum allowed by the coverage pattern.
  */
 function validateScoreAgainstCoverage(
   score: number | null,
@@ -90,18 +106,12 @@ function validateScoreAgainstCoverage(
   const total = criteriaResults.length;
   const covered = criteriaResults.filter((c) => c.coverage === "covered").length;
   const partial = criteriaResults.filter((c) => c.coverage === "partial").length;
-  const coverageRatio = (covered + partial * 0.5) / total;
+  const missing = criteriaResults.filter((c) => c.coverage === "missing").length;
 
-  // Expected score range based on coverage
-  const expectedMin = Math.max(0, Math.round(coverageRatio * 100 - 20));
-  const expectedMax = Math.min(100, Math.round(coverageRatio * 100 + 20));
+  const ceiling = getScoreCeiling(covered, partial, missing, total);
 
-  // If score is wildly off (>25 points from expected range), clamp it
-  if (score > expectedMax + 25) {
-    return expectedMax;
-  }
-  if (score < expectedMin - 25) {
-    return expectedMin;
+  if (score > ceiling) {
+    return ceiling;
   }
 
   return score;

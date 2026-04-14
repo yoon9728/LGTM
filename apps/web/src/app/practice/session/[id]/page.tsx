@@ -683,7 +683,7 @@ export default function SessionPage({ params }: { params: Promise<{ id: string }
         </p>
         <p className="text-sm text-muted-foreground">AI-graded against expert criteria.</p>
       </div>
-      <EvaluationResult evaluation={evaluation} />
+      <EvaluationResult evaluation={evaluation} isGuest={!isAuthenticated} />
 
       {/* Signup prompt for guests */}
       {showSignupPrompt && !isAuthenticated && (
