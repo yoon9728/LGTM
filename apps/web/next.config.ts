@@ -20,9 +20,9 @@ const nextConfig: NextConfig = {
             value: [
               "default-src 'self'",
               "script-src 'self' 'unsafe-eval' 'unsafe-inline' https://cdn.jsdelivr.net",
-              "style-src 'self' 'unsafe-inline'",
+              "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net",
               "img-src 'self' data: https:",
-              "font-src 'self' https://fonts.gstatic.com",
+              "font-src 'self' https://fonts.gstatic.com https://cdn.jsdelivr.net data:",
               `connect-src 'self' ${process.env.NEXT_PUBLIC_API_URL || "http://localhost:4300"} https://cdn.jsdelivr.net`,
               "worker-src blob: https://cdn.jsdelivr.net",
             ].join("; "),
