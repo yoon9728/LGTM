@@ -1,39 +1,46 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4300";
+
+// Headers that must not be forwarded between hops
+const HOP_HEADERS = new Set([
+  "host", "connection", "keep-alive", "transfer-encoding",
+  "te", "trailer", "upgrade", "proxy-authorization",
+  "proxy-authenticate", "content-encoding", "content-length",
+  "accept-encoding",
+]);
 
 async function proxyAuth(req: NextRequest) {
   const url = new URL(req.url);
   const target = `${API_BASE}${url.pathname}${url.search}`;
 
-  // Forward all headers except host
-  const headers = new Headers(req.headers);
-  headers.delete("host");
-
-  // Forward cookies from the browser to the API
-  const cookieHeader = req.headers.get("cookie");
-  if (cookieHeader) headers.set("cookie", cookieHeader);
+  // Build minimal forwarding headers
+  const fwdHeaders = new Headers();
+  const contentType = req.headers.get("content-type");
+  if (contentType) fwdHeaders.set("content-type", contentType);
+  const cookie = req.headers.get("cookie");
+  if (cookie) fwdHeaders.set("cookie", cookie);
+  const accept = req.headers.get("accept");
+  if (accept) fwdHeaders.set("accept", accept);
+  const origin = req.headers.get("origin");
+  if (origin) fwdHeaders.set("origin", origin);
 
   const res = await fetch(target, {
     method: req.method,
-    headers,
+    headers: fwdHeaders,
     body: req.method !== "GET" && req.method !== "HEAD" ? await req.text() : undefined,
     redirect: "manual",
   });
 
-  // Read body fully before building response (streaming can drop data on Vercel)
-  const body = await res.arrayBuffer();
-  const proxyRes = new NextResponse(body, {
-    status: res.status,
-    statusText: res.statusText,
-  });
+  // Read body fully (streaming can drop data on serverless)
+  const bodyText = await res.text();
 
-  // Copy response headers
+  // Build response with only safe headers
+  const resHeaders = new Headers();
   res.headers.forEach((value, key) => {
     const lower = key.toLowerCase();
-    // Skip set-cookie (handled separately) and transfer-encoding
-    if (lower === "set-cookie" || lower === "transfer-encoding") return;
-    proxyRes.headers.set(key, value);
+    if (lower === "set-cookie" || HOP_HEADERS.has(lower)) return;
+    resHeaders.set(key, value);
   });
 
   // Rewrite Set-Cookie: strip Domain so cookies land on web domain (first-party)
@@ -42,10 +49,14 @@ async function proxyAuth(req: NextRequest) {
     const cleaned = raw
       .replace(/;\s*[Dd]omain=[^;]*/g, "")
       .replace(/;\s*[Ss]ame[Ss]ite=[^;]*/g, "; SameSite=Lax");
-    proxyRes.headers.append("set-cookie", cleaned);
+    resHeaders.append("set-cookie", cleaned);
   }
 
-  return proxyRes;
+  return new Response(bodyText, {
+    status: res.status,
+    statusText: res.statusText,
+    headers: resHeaders,
+  });
 }
 
 export const GET = proxyAuth;
