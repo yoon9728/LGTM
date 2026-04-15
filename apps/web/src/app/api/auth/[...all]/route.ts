@@ -21,8 +21,8 @@ async function proxyAuth(req: NextRequest) {
     redirect: "manual",
   });
 
-  // Build response
-  const body = res.body;
+  // Read body fully before building response (streaming can drop data on Vercel)
+  const body = await res.arrayBuffer();
   const proxyRes = new NextResponse(body, {
     status: res.status,
     statusText: res.statusText,
