@@ -1,4 +1,9 @@
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4300";
+// Route API calls through the Next.js proxy so session cookies (first-party) are sent.
+// On the server (SSR/build) we still need the direct URL for non-browser contexts.
+const API_BASE =
+  typeof window !== "undefined"
+    ? "/api/v1"                                                       // browser → same-origin proxy
+    : (process.env.NEXT_PUBLIC_API_URL || "http://localhost:4300");    // server-side
 
 /** Custom error class that preserves HTTP status code */
 export class ApiError extends Error {
@@ -13,7 +18,6 @@ export class ApiError extends Error {
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
   const res = await fetch(`${API_BASE}${path}`, {
     headers: { "Content-Type": "application/json" },
-    credentials: "include",
     ...options,
   });
   if (!res.ok) {
@@ -197,7 +201,8 @@ export interface CategoryDetail {
 
 /** Fire-and-forget ping to wake the API from cold start */
 export function warmUpApi() {
-  fetch(`${API_BASE}/health`, { method: "GET" }).catch(() => {});
+  const directApi = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4300";
+  fetch(`${directApi}/health`, { method: "GET" }).catch(() => {});
 }
 
 export const api = {
