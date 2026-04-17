@@ -182,9 +182,11 @@ export const answerRoutes = new Hono()
 
     if (body.sessionId) await db.sessions.updateStatus(body.sessionId, "answer_submitted");
 
-    // Get question and resolve rubric (cached AI-generated, or generates on first use)
-    let question = await db.questions.getById(answer.questionId);
-    if (question) {
+    // Get question and resolve rubric (cached AI-generated, or generates on first use).
+    // MCQ: skip both DB lookup and rubric resolution — exact-match eval doesn't need them,
+    // and getRubric would otherwise call OpenAI every time since MCQ has an empty mustCover.
+    let question = isMcq ? session.question : await db.questions.getById(answer.questionId);
+    if (question && !isMcq) {
       const rubric = await getRubric(question);
       question = { ...question, rubric };
     }

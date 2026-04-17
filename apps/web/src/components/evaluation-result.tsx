@@ -83,6 +83,47 @@ export function EvaluationResult({ evaluation, isGuest = false }: EvaluationResu
   ).length ?? 0;
   const totalCriteria = evaluation.criteriaResults?.length ?? 0;
 
+  // MCQ: render a minimal Correct/Incorrect verdict + explanation instead of full rubric UI.
+  if (evaluation.provider === "mcq-exact-match") {
+    const isCorrect = score === 100;
+    return (
+      <div className="space-y-5">
+        <div
+          className={cn(
+            "flex items-center gap-3 rounded-lg border p-5",
+            isCorrect
+              ? "border-primary/30 bg-primary/5"
+              : "border-destructive/30 bg-destructive/5"
+          )}
+        >
+          {isCorrect ? (
+            <CheckIcon className="size-7 text-primary shrink-0" />
+          ) : (
+            <XIcon className="size-7 text-destructive shrink-0" />
+          )}
+          <div className="flex-1">
+            <p
+              className={cn(
+                "text-2xl font-bold tracking-tight font-mono",
+                isCorrect ? "text-primary" : "text-destructive"
+              )}
+            >
+              {isCorrect ? "Correct" : "Incorrect"}
+            </p>
+          </div>
+        </div>
+
+        {evaluation.rationale && (
+          <blockquote className="border-l-2 border-muted-foreground/30 pl-4 text-sm leading-relaxed text-muted-foreground">
+            {evaluation.rationale}
+          </blockquote>
+        )}
+
+        {isGuest && <GuestUpgradeBanner />}
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       {/* Score */}

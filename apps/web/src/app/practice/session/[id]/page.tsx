@@ -789,14 +789,16 @@ export default function SessionPage({ params }: { params: Promise<{ id: string }
               {loading ? (
                 <>
                   <Loader2Icon className="size-4 animate-spin mr-2" />
-                  Evaluating...
+                  {isMcq ? "Checking..." : "Evaluating..."}
                 </>
               ) : (
-                "Submit & get AI evaluation"
+                isMcq ? "Submit answer" : "Submit & get AI evaluation"
               )}
             </Button>
             <p className="text-[11px] text-muted-foreground">
-              Your answer will be graded by AI against expert criteria
+              {isMcq
+                ? "Instant feedback — no AI evaluation needed"
+                : "Your answer will be graded by AI against expert criteria"}
             </p>
           </div>
         )}
