@@ -33,6 +33,10 @@ async function seed() {
         rubric: q.rubric,
         templates: q.templates ?? null,
         guest: q.guest ?? false,
+        format: q.format ?? null,
+        choices: q.choices ?? null,
+        correctAnswer: q.correctAnswer ?? null,
+        explanation: q.explanation ?? null,
       })
       .onConflictDoNothing();
   }

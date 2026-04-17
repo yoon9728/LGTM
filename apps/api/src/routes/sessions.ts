@@ -1,9 +1,16 @@
 import { Hono } from "hono";
-import { db } from "../data/store.js";
+import { db, type Session } from "../data/store.js";
 import { evaluate } from "../services/evaluation.js";
 import { optionalAuth, type AuthUser } from "../middleware/auth.js";
 import { getClientIp } from "../lib/ip.js";
 import { VALID_LANGUAGES } from "../lib/constants.js";
+
+// Strip server-only fields from question so clients can't read the answer.
+function sanitizeSession(session: Session): Session {
+  const q = session.question;
+  const { rubric: _rubric, correctAnswer: _correctAnswer, explanation: _explanation, ...safeQuestion } = q;
+  return { ...session, question: safeQuestion as typeof q };
+}
 
 const GUEST_SESSION_LIMIT = 4;
 const guestUsage = new Map<string, { count: number; resetAt: number }>();
@@ -87,7 +94,7 @@ export const sessionRoutes = new Hono()
       question,
       createdAt: new Date().toISOString(),
     });
-    return c.json({ ok: true, session, isGuest }, 201);
+    return c.json({ ok: true, session: sanitizeSession(session), isGuest }, 201);
   })
 
   .patch("/:id", async (c) => {
@@ -105,7 +112,7 @@ export const sessionRoutes = new Hono()
       await db.sessions.updateLanguage(session.id, body.language);
       session.language = body.language;
     }
-    return c.json({ ok: true, session });
+    return c.json({ ok: true, session: sanitizeSession(session) });
   })
 
   .get("/:id", async (c) => {
@@ -114,7 +121,7 @@ export const sessionRoutes = new Hono()
     if (!session) return c.json({ error: "Session not found" }, 404);
     const isOwner = session.candidateId === "guest" || user?.id === session.candidateId;
     if (!isOwner) return c.json({ error: "Forbidden" }, 403);
-    return c.json({ ok: true, session });
+    return c.json({ ok: true, session: sanitizeSession(session) });
   })
 
   .post("/:id/retry-evaluation", async (c) => {

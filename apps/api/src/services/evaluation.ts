@@ -145,6 +145,36 @@ export async function evaluate(answer: Answer, question?: Question): Promise<Eva
     completedAt: null,
   };
 
+  // MCQ: exact-match evaluation, no AI call.
+  if (question?.format === "mcq" && question.correctAnswer) {
+    const selected = String((answer.review as { selectedAnswer?: string }).selectedAnswer ?? "")
+      .trim().toUpperCase();
+    const correct = question.correctAnswer.trim().toUpperCase();
+    const isCorrect = selected === correct;
+    const score = isCorrect ? 100 : 0;
+    const correctText = question.choices?.[correct.charCodeAt(0) - 65] ?? "";
+    const selectedText = selected ? (question.choices?.[selected.charCodeAt(0) - 65] ?? "") : "";
+
+    return db.evaluations.insert({
+      ...base,
+      status: "completed",
+      score,
+      evaluable: true,
+      reason: null,
+      rationale: isCorrect
+        ? `Correct. ${question.explanation ?? ""}`.trim()
+        : `Incorrect. You selected ${selected || "(none)"}${selectedText ? ` — "${selectedText}"` : ""}. The correct answer is ${correct}${correctText ? ` — "${correctText}"` : ""}. ${question.explanation ?? ""}`.trim(),
+      strengths: isCorrect ? ["Correct concept identification."] : [],
+      weaknesses: isCorrect ? [] : [`Selected ${selected || "(none)"} instead of ${correct}.`],
+      nextSteps: isCorrect
+        ? ["Move to the next question — review tougher items in this topic for depth."]
+        : [`Review the explanation and the definition being tested (${question.title}).`],
+      criteriaResults: [],
+      provider: "mcq-exact-match",
+      completedAt: new Date().toISOString(),
+    });
+  }
+
   try {
     const result = await withTimeout(callOpenAI(answer, question));
     const evaluable = result.evaluable !== false;

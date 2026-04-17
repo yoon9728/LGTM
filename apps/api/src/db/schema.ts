@@ -72,6 +72,11 @@ export const questions = pgTable("questions", {
   templates: jsonb("templates"), // practical_coding: { python: "...", java: "...", ... }
   guest: boolean("guest").notNull().default(false),
   tags: jsonb("tags").default([]),
+  // MCQ-specific columns (null for scenario questions)
+  format: text("format"), // null | "mcq"
+  choices: jsonb("choices"), // string[] for MCQ, null otherwise
+  correctAnswer: text("correct_answer"), // "A" | "B" | "C" | "D" | "E"
+  explanation: text("explanation"), // MCQ rationale shown after answering
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 }, (t) => [
   index("idx_questions_cat_type_lang_diff").on(t.category, t.type, t.language, t.difficulty),

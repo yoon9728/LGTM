@@ -77,6 +77,8 @@ export default function SessionPage({ params }: { params: Promise<{ id: string }
   const [analysis, setAnalysis] = useState("");
   const [recommendation, setRecommendation] = useState("");
   const [reasoning, setReasoning] = useState("");
+  // MCQ (CFA multiple-choice)
+  const [selectedAnswer, setSelectedAnswer] = useState<string>("");
   // Practical Coding fields (block editor)
   const [codeBlocks, setCodeBlocks] = useState<Block[]>(() => [
     { id: crypto.randomUUID(), type: "code", language: "javascript", content: "" },
@@ -179,6 +181,9 @@ export default function SessionPage({ params }: { params: Promise<{ id: string }
       questionId: session.question.id,
       category: cat,
     };
+    if (session.question.format === "mcq") {
+      return { ...base, selectedAnswer };
+    }
     switch (cat) {
       case "system_design":
         return { ...base, overview, components, tradeoffs, scalingStrategy };
@@ -216,7 +221,7 @@ export default function SessionPage({ params }: { params: Promise<{ id: string }
           findings: findings.split("\n").map((l) => l.replace(/^\d+\.\s*/, "").trim()).filter(Boolean),
         };
     }
-  }, [session, summary, findings, overview, components, tradeoffs, scalingStrategy, rootCause, evidence, fixBlocks, queryBlocks, explanation, optimization, codeBlocks, approach, complexity, analysis, recommendation, reasoning, serializeBlocks]);
+  }, [session, summary, findings, overview, components, tradeoffs, scalingStrategy, rootCause, evidence, fixBlocks, queryBlocks, explanation, optimization, codeBlocks, approach, complexity, analysis, recommendation, reasoning, selectedAnswer, serializeBlocks]);
 
   const hasBlockContent = useCallback((blocks: Block[]) => {
     return blocks.some((b) => b.content.trim().length > 0);
@@ -224,6 +229,7 @@ export default function SessionPage({ params }: { params: Promise<{ id: string }
 
   const isFormValid = useCallback(() => {
     if (!session?.question) return false;
+    if (session.question.format === "mcq") return !!selectedAnswer;
     switch (session.question.category) {
       case "system_design": return !!(overview.trim() || components.trim());
       case "debugging": return !!rootCause.trim();
@@ -232,7 +238,7 @@ export default function SessionPage({ params }: { params: Promise<{ id: string }
       case "cfa": return !!analysis.trim();
       default: return !!summary.trim();
     }
-  }, [session, summary, overview, components, rootCause, queryBlocks, explanation, codeBlocks, analysis, hasBlockContent]);
+  }, [session, summary, overview, components, rootCause, queryBlocks, explanation, codeBlocks, analysis, selectedAnswer, hasBlockContent]);
 
   const submitAnswer = useCallback(
     async (e: React.FormEvent) => {
@@ -291,6 +297,7 @@ export default function SessionPage({ params }: { params: Promise<{ id: string }
   }, [session, router]);
 
   const category = session?.question.category ?? "code_review";
+  const isMcq = session?.question.format === "mcq";
   /** User-chosen language (session level) > question-level language */
   const sessionLanguage = selectedLanguage ?? session?.language ?? session?.question.language ?? null;
   const backUrl = session ? `/practice/${category}/${session.question.type}` : "/practice";
@@ -358,7 +365,7 @@ export default function SessionPage({ params }: { params: Promise<{ id: string }
         <h2 className="text-xl font-semibold tracking-tight">{session?.question.title}</h2>
         <p className="text-sm text-muted-foreground leading-relaxed whitespace-pre-line">{session?.question.prompt}</p>
       </div>
-      {category !== "practical_coding" && category !== "cfa" && (
+      {category !== "practical_coding" && category !== "cfa" && !isMcq && (
         <DiffViewer diff={session?.question.diff ?? ""} />
       )}
       {step === "diff" && (
@@ -400,13 +407,18 @@ export default function SessionPage({ params }: { params: Promise<{ id: string }
             </div>
           )}
           <Button type="button" onClick={handleStartAnalysis} disabled={category === "practical_coding" && !selectedLanguage}>
-            {category === "code_review" && "I've read the code — write my review"}
-            {category === "system_design" && "I've read the requirements — write my design"}
-            {category === "debugging" && "I've read the code — diagnose the bug"}
-            {category === "data_analysis" && "I've read the problem — write my solution"}
-            {category === "practical_coding" && "I've read the problem — write my code"}
-            {category === "cfa" && "I've read the scenario — write my answer"}
-            {!["code_review", "system_design", "debugging", "data_analysis", "practical_coding", "cfa"].includes(category) && "I've read the code — write my analysis"}
+            {isMcq
+              ? "Show answer choices"
+              : <>
+                  {category === "code_review" && "I've read the code — write my review"}
+                  {category === "system_design" && "I've read the requirements — write my design"}
+                  {category === "debugging" && "I've read the code — diagnose the bug"}
+                  {category === "data_analysis" && "I've read the problem — write my solution"}
+                  {category === "practical_coding" && "I've read the problem — write my code"}
+                  {category === "cfa" && "I've read the scenario — write my answer"}
+                  {!["code_review", "system_design", "debugging", "data_analysis", "practical_coding", "cfa"].includes(category) && "I've read the code — write my analysis"}
+                </>
+            }
             <ArrowRightIcon className="size-4 ml-2" />
           </Button>
         </div>
@@ -418,21 +430,73 @@ export default function SessionPage({ params }: { params: Promise<{ id: string }
     <div className="space-y-4" ref={rightPanelRef}>
       <div className="space-y-1">
         <p className="text-xs font-semibold tracking-wide uppercase text-muted-foreground">
-          02 · Your {category === "code_review" ? "Analysis" : category === "system_design" ? "Design" : category === "debugging" ? "Diagnosis" : category === "data_analysis" ? "Solution" : category === "cfa" ? "Response" : "Implementation"}
+          02 · {isMcq ? "Choose your answer" : `Your ${category === "code_review" ? "Analysis" : category === "system_design" ? "Design" : category === "debugging" ? "Diagnosis" : category === "data_analysis" ? "Solution" : category === "cfa" ? "Response" : "Implementation"}`}
         </p>
         <p className="text-sm text-muted-foreground">
-          {category === "code_review" && "Write precisely. Vague answers score poorly."}
-          {category === "system_design" && "Describe your architecture clearly. Justify your design choices."}
-          {category === "debugging" && "Identify the root cause with evidence. Propose a concrete fix."}
-          {category === "data_analysis" && "Write your query and explain your reasoning."}
-          {category === "practical_coding" && "Write clean, working code. Explain your approach."}
-          {category === "cfa" && "Identify the applicable standard or concept, recommend an action, and justify your reasoning."}
+          {isMcq && "Pick the best answer. You'll see the explanation right after."}
+          {!isMcq && category === "code_review" && "Write precisely. Vague answers score poorly."}
+          {!isMcq && category === "system_design" && "Describe your architecture clearly. Justify your design choices."}
+          {!isMcq && category === "debugging" && "Identify the root cause with evidence. Propose a concrete fix."}
+          {!isMcq && category === "data_analysis" && "Write your query and explain your reasoning."}
+          {!isMcq && category === "practical_coding" && "Write clean, working code. Explain your approach."}
+          {!isMcq && category === "cfa" && "Identify the applicable standard or concept, recommend an action, and justify your reasoning."}
         </p>
       </div>
       <form onSubmit={submitAnswer} className="space-y-4">
 
+        {/* MCQ Form */}
+        {isMcq && session.question.choices && (
+          <div className="space-y-2">
+            {session.question.choices.map((choice, idx) => {
+              const letter = String.fromCharCode(65 + idx); // A, B, C, D...
+              const isSelected = selectedAnswer === letter;
+              const isResult = step === "result";
+              const evalRationale = evaluation?.rationale ?? "";
+              // Parse correct letter out of rationale ("The correct answer is X" or "Correct")
+              let correctLetter = "";
+              const match = evalRationale.match(/correct answer is ([A-E])/i);
+              if (match) correctLetter = match[1].toUpperCase();
+              else if (evalRationale.startsWith("Correct") && isSelected) correctLetter = letter;
+              const isCorrect = isResult && correctLetter === letter;
+              const isWrongSelected = isResult && isSelected && correctLetter && correctLetter !== letter;
+              return (
+                <button
+                  key={letter}
+                  type="button"
+                  disabled={isResult}
+                  onClick={() => setSelectedAnswer(letter)}
+                  className={`w-full text-left rounded-lg border px-4 py-3 transition-colors ${
+                    isCorrect
+                      ? "border-emerald-500 bg-emerald-500/10"
+                      : isWrongSelected
+                        ? "border-rose-500 bg-rose-500/10"
+                        : isSelected
+                          ? "border-primary bg-primary/5"
+                          : "border-border hover:border-primary/50 hover:bg-muted/30"
+                  } ${isResult ? "cursor-default" : "cursor-pointer"}`}
+                >
+                  <div className="flex items-start gap-3">
+                    <span className={`text-xs font-mono font-semibold rounded px-1.5 py-0.5 mt-0.5 shrink-0 ${
+                      isCorrect
+                        ? "bg-emerald-500 text-white"
+                        : isWrongSelected
+                          ? "bg-rose-500 text-white"
+                          : isSelected
+                            ? "bg-primary text-primary-foreground"
+                            : "bg-muted text-foreground/70"
+                    }`}>
+                      {letter}
+                    </span>
+                    <span className="text-sm text-foreground/90 leading-relaxed">{choice}</span>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        )}
+
         {/* Code Review Form */}
-        {(category === "code_review" || !["system_design", "debugging", "data_analysis", "practical_coding", "cfa"].includes(category)) && (
+        {!isMcq && (category === "code_review" || !["system_design", "debugging", "data_analysis", "practical_coding", "cfa"].includes(category)) && (
           <>
             <div className="space-y-2">
               <label htmlFor="summary" className="text-sm font-medium text-foreground">
@@ -607,7 +671,7 @@ export default function SessionPage({ params }: { params: Promise<{ id: string }
         )}
 
         {/* CFA Form */}
-        {category === "cfa" && (
+        {category === "cfa" && !isMcq && (
           <>
             <div className="space-y-2">
               <label htmlFor="analysis" className="text-sm font-medium text-foreground">

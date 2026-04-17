@@ -37,6 +37,11 @@ export interface Question {
   prompt: string;
   diff: string;
   templates?: Record<string, string>;
+  // MCQ (only present when format === "mcq")
+  format?: "mcq";
+  choices?: string[];
+  // correctAnswer is intentionally stripped server-side before sending to clients
+  explanation?: string;
 }
 
 export interface QuestionListItem {
@@ -49,6 +54,7 @@ export interface QuestionListItem {
   prompt: string;
   bestScore: number | null;
   completed: boolean;
+  format?: "mcq" | null;
 }
 
 export interface TypeStats {

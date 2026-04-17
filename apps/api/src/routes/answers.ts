@@ -37,6 +37,8 @@ export const answerRoutes = new Hono()
       analysis?: string;
       recommendation?: string;
       reasoning?: string;
+      // MCQ
+      selectedAnswer?: string;
       // block editor structured data (optional, for richer evaluation)
       blocks?: { type: string; language?: string; content: string }[];
     }>();
@@ -61,11 +63,24 @@ export const answerRoutes = new Hono()
       }
     }
 
-    const cat = body.category ?? "code_review";
+    // Early session lookup — needed to detect MCQ questions by question.format
+    const earlySession = body.sessionId ? await db.sessions.get(body.sessionId) : undefined;
+    if (body.sessionId && !earlySession) {
+      return c.json({ error: "Session not found" }, 404);
+    }
+
+    const isMcq = earlySession?.question?.format === "mcq";
+    const cat = isMcq ? "mcq" : (body.category ?? "code_review");
 
     // Category-specific content validation
     let content: Record<string, unknown> = {};
-    switch (cat) {
+    if (isMcq) {
+      const selected = (body.selectedAnswer ?? "").trim().toUpperCase();
+      const validLetters = ["A", "B", "C", "D", "E"];
+      if (!selected) errors.push("selectedAnswer is required.");
+      else if (!validLetters.includes(selected)) errors.push("selectedAnswer must be A, B, C, D, or E.");
+      content = { selectedAnswer: selected };
+    } else switch (cat) {
       case "code_review": {
         if (!body.diff?.trim()) errors.push("diff is required.");
         const summary = (body.summary ?? "").trim();
@@ -139,8 +154,8 @@ export const answerRoutes = new Hono()
 
     if (errors.length > 0) return c.json({ error: { code: "invalid_input", details: errors } }, 400);
 
-    // Validate session exists first
-    const session = body.sessionId ? await db.sessions.get(body.sessionId) : undefined;
+    // Session was looked up earlier; ensure still present
+    const session = earlySession;
     if (!session) return c.json({ error: "Session not found" }, 404);
 
     // Ownership check — only session owner or guest sessions allowed

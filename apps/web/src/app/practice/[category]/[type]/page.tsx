@@ -306,6 +306,11 @@ export default function TypeQuestionsPage({
                                     {q.difficulty}
                                   </span>
                                 )}
+                                {q.format === "mcq" && (
+                                  <span className="text-[10px] font-mono font-semibold tracking-wide uppercase px-1.5 py-0.5 rounded bg-cyan-500/10 text-cyan-600 dark:text-cyan-400">
+                                    MCQ
+                                  </span>
+                                )}
                               </div>
                               <p className="text-xs text-muted-foreground leading-relaxed line-clamp-2">
                                 {q.prompt}
@@ -383,6 +388,11 @@ export default function TypeQuestionsPage({
                                   "bg-amber-500/10 text-amber-600 dark:text-amber-400"
                                 }`}>
                                   {q.difficulty}
+                                </span>
+                              )}
+                              {q.format === "mcq" && (
+                                <span className="text-[10px] font-mono font-semibold tracking-wide uppercase px-1.5 py-0.5 rounded shrink-0 bg-cyan-500/10 text-cyan-600 dark:text-cyan-400">
+                                  MCQ
                                 </span>
                               )}
                             </div>

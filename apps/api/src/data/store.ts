@@ -65,6 +65,10 @@ function toQuestion(qRow: {
   rubric: unknown;
   templates: unknown;
   guest: boolean;
+  format?: string | null;
+  choices?: unknown;
+  correctAnswer?: string | null;
+  explanation?: string | null;
 }): Question {
   return {
     id: qRow.id,
@@ -78,6 +82,10 @@ function toQuestion(qRow: {
     rubric: qRow.rubric as Question["rubric"],
     ...(qRow.templates ? { templates: qRow.templates as Record<string, string> } : {}),
     ...(qRow.guest ? { guest: true } : {}),
+    ...(qRow.format === "mcq" ? { format: "mcq" as const } : {}),
+    ...(Array.isArray(qRow.choices) ? { choices: qRow.choices as string[] } : {}),
+    ...(qRow.correctAnswer ? { correctAnswer: qRow.correctAnswer } : {}),
+    ...(qRow.explanation ? { explanation: qRow.explanation } : {}),
   };
 }
 

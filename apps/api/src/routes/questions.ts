@@ -36,6 +36,7 @@ export const questionRoutes = new Hono()
       prompt: q.prompt,
       bestScore: bestScores.get(q.id) ?? null,
       completed: (bestScores.get(q.id) ?? 0) >= 90,
+      format: q.format ?? null,
     }));
 
     // Group by category > type with counts
@@ -82,7 +83,7 @@ export const questionRoutes = new Hono()
   .get("/:id", async (c) => {
     const q = await db.questions.getById(c.req.param("id"));
     if (!q) return c.json({ error: "Question not found" }, 404);
-    // Strip rubric to prevent answer gaming
-    const { rubric: _rubric, ...safeQuestion } = q;
+    // Strip rubric, correctAnswer, and explanation — all leak answer info
+    const { rubric: _rubric, correctAnswer: _correctAnswer, explanation: _explanation, ...safeQuestion } = q;
     return c.json({ ok: true, question: safeQuestion });
   });

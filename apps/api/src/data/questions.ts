@@ -1,6 +1,6 @@
 export interface Question {
   id: string;
-  category: string;    // 대분류: code_review, system_design, debugging, data_analysis, practical_coding
+  category: string;    // 대분류: code_review, system_design, debugging, data_analysis, practical_coding, cfa
   type: string;        // 서브카테고리: security_review, scalability, runtime_error, sql_query, etc.
   difficulty?: "easy" | "medium" | "hard";
   language?: string;   // code_review: javascript, python, java / practical_coding: java, python, c_cpp, javascript, rust, go, kotlin, typescript
@@ -14,10 +14,16 @@ export interface Question {
     strongSignals: string[];
     weakPatterns: string[];
   };
+  // MCQ-specific (only set when format === "mcq")
+  format?: "mcq";
+  choices?: string[];          // e.g. ["Whichever is stricter", "Local law always", ...]
+  correctAnswer?: string;      // letter: "A" | "B" | "C" | "D" | "E"
+  explanation?: string;        // shown after the user answers
 }
 
 import { practicalCodingQuestions } from "./practical-coding-questions.js";
 import { cfaQuestions } from "./cfa-questions.js";
+import { cfaMcqQuestions } from "./cfa-mcq-questions.js";
 
 const questions: Question[] = [
   // ════════════════════════════════════════════════════════
@@ -1234,6 +1240,7 @@ with columns, grain, and explain how each business question maps to the model.`,
 
   ...practicalCodingQuestions,
   ...cfaQuestions,
+  ...cfaMcqQuestions,
 ];
 
 // ── Metadata for categories and types ────────────────────
