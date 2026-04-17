@@ -17,6 +17,7 @@ export interface Question {
 }
 
 import { practicalCodingQuestions } from "./practical-coding-questions.js";
+import { cfaQuestions } from "./cfa-questions.js";
 
 const questions: Question[] = [
   // ════════════════════════════════════════════════════════
@@ -1232,6 +1233,7 @@ with columns, grain, and explain how each business question maps to the model.`,
   },
 
   ...practicalCodingQuestions,
+  ...cfaQuestions,
 ];
 
 // ── Metadata for categories and types ────────────────────
@@ -1301,6 +1303,23 @@ export const CATEGORIES: CategoryMeta[] = [
     types: [
       { id: "implementation", label: "Implementation", description: "Build data structures and systems from scratch" },
       { id: "optimization", label: "Optimization", description: "Profile and optimize existing code" },
+    ],
+  },
+  {
+    id: "cfa",
+    label: "CFA (Canadian)",
+    description: "Scenario-based concept questions across the 10 CFA topic areas — Canadian regulatory context, IFRS, no calculations.",
+    types: [
+      { id: "ethics", label: "Ethics & Professional Standards", description: "Apply CFA Code & Standards to realistic scenarios" },
+      { id: "quantitative_methods", label: "Quantitative Methods", description: "Interpret statistical results, avoid common pitfalls" },
+      { id: "economics", label: "Economics", description: "Macro & Canadian policy scenarios, currency, trade" },
+      { id: "corporate_issuers", label: "Corporate Issuers", description: "Governance, capital structure, stakeholder tradeoffs" },
+      { id: "fsa", label: "Financial Statement Analysis", description: "IFRS interpretation, quality of earnings, red flags" },
+      { id: "equity", label: "Equity", description: "Valuation frameworks, industry analysis, investment thesis" },
+      { id: "fixed_income", label: "Fixed Income", description: "Credit, duration, Canadian bond market, CDOR/CORRA" },
+      { id: "derivatives", label: "Derivatives", description: "Hedging, payoff structures, options/futures scenarios" },
+      { id: "alternatives", label: "Alternative Investments", description: "Private equity, real estate, infrastructure, hedge funds" },
+      { id: "portfolio_management", label: "Portfolio Management", description: "IPS, asset allocation, risk budgeting, behavioral finance" },
     ],
   },
 ];

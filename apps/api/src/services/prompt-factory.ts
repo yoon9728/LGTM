@@ -131,6 +131,31 @@ Evaluate code correctness, readability, edge case handling, approach explanation
 - 30-49: Significant correctness issues, unclear approach
 - 0-29: Did not produce working code`,
   },
+
+  cfa: {
+    label: "CFA (Canadian)",
+    answerContext: `The candidate's answer contains:
+- analysis: Their analysis of the scenario (what is happening, what standards or concepts apply, what the key issue is)
+- recommendation: Their recommended action, decision, or conclusion
+- reasoning: The reasoning chain that connects analysis to recommendation
+
+This is a scenario-based Canadian CFA concept question — evaluate judgment and application of concepts, not computation.
+Use Canadian regulatory context where relevant (CIRO, CSA, NI 51-102, IFRS not US GAAP, RRSP/TFSA/RRIF).
+CFA Institute Code of Ethics and Standards are global and apply universally.`,
+    evaluationDimensions: [
+      "Correct identification of applicable CFA standard / concept / framework",
+      "Accuracy of analysis against the scenario facts",
+      "Soundness of the recommendation or conclusion",
+      "Quality of the reasoning chain connecting facts to conclusion",
+      "Awareness of Canadian regulatory / accounting context where relevant",
+    ],
+    scoringGuidance: `Scoring guidance:
+- 90-100: Correctly identifies the governing standard/framework, applies it precisely to the scenario, recommendation is well-justified, reasoning is clear
+- 70-89: Correct framework and generally correct conclusion, reasoning is mostly sound with minor gaps
+- 50-69: Partial understanding — touches the right area but application is weak or conclusion is imprecise
+- 30-49: Wrong framework or significant misapplication, recommendation not well supported
+- 0-29: Did not meaningfully engage with the scenario`,
+  },
 };
 
 // Default config for unknown categories

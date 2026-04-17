@@ -17,6 +17,7 @@ const CATEGORY_LABELS: Record<string, string> = {
   debugging: "Debugging",
   data_analysis: "Data Analysis",
   practical_coding: "Practical Coding",
+  cfa: "CFA",
 };
 
 interface CategoryRadarChartProps {
@@ -39,6 +40,7 @@ export function CategoryRadarChart({ data }: CategoryRadarChartProps) {
     "debugging",
     "data_analysis",
     "practical_coding",
+    "cfa",
   ];
 
   const radarData = allCategories.map((cat) => {

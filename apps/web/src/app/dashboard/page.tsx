@@ -24,6 +24,7 @@ import {
   TableIcon,
   PencilLineIcon,
   SparklesIcon,
+  ScaleIcon,
 } from "lucide-react";
 
 const CategoryRadarChart = dynamic(
@@ -40,6 +41,7 @@ const CATEGORY_LABELS: Record<string, string> = {
   debugging: "Debugging",
   data_analysis: "Data Analysis",
   practical_coding: "Practical Coding",
+  cfa: "CFA (Canadian)",
 };
 
 const CATEGORY_ICONS: Record<string, React.ReactNode> = {
@@ -48,6 +50,7 @@ const CATEGORY_ICONS: Record<string, React.ReactNode> = {
   debugging: <TerminalIcon className="size-4" />,
   data_analysis: <TableIcon className="size-4" />,
   practical_coding: <PencilLineIcon className="size-4" />,
+  cfa: <ScaleIcon className="size-4" />,
 };
 
 const CATEGORY_ACCENT: Record<string, string> = {
@@ -56,6 +59,7 @@ const CATEGORY_ACCENT: Record<string, string> = {
   debugging: "text-amber-500 bg-amber-500/10",
   data_analysis: "text-emerald-500 bg-emerald-500/10",
   practical_coding: "text-rose-500 bg-rose-500/10",
+  cfa: "text-cyan-500 bg-cyan-500/10",
 };
 
 function relativeTime(dateStr: string): string {
@@ -109,7 +113,7 @@ export default function DashboardPage() {
   if (!stats) return null;
 
   const { overview, categoryStats, recentSessions, weakestCategory } = stats;
-  const allCategories = ["code_review", "system_design", "debugging", "data_analysis", "practical_coding"];
+  const allCategories = ["code_review", "system_design", "debugging", "data_analysis", "practical_coding", "cfa"];
 
   return (
     <div className="min-h-dvh flex flex-col">

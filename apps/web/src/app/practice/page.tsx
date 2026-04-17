@@ -22,6 +22,7 @@ import {
   TerminalIcon,
   TableIcon,
   PencilLineIcon,
+  ScaleIcon,
 } from "lucide-react";
 
 const CATEGORY_ICONS: Record<string, React.ReactNode> = {
@@ -30,6 +31,7 @@ const CATEGORY_ICONS: Record<string, React.ReactNode> = {
   debugging: <TerminalIcon className="size-5" />,
   data_analysis: <TableIcon className="size-5" />,
   practical_coding: <PencilLineIcon className="size-5" />,
+  cfa: <ScaleIcon className="size-5" />,
 };
 
 const CATEGORY_ACCENT: Record<string, string> = {
@@ -38,6 +40,7 @@ const CATEGORY_ACCENT: Record<string, string> = {
   debugging: "bg-amber-500/10 text-amber-500",
   data_analysis: "bg-emerald-500/10 text-emerald-500",
   practical_coding: "bg-rose-500/10 text-rose-500",
+  cfa: "bg-cyan-500/10 text-cyan-500",
 };
 
 export default function PracticeTypesPage() {

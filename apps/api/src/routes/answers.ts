@@ -33,6 +33,10 @@ export const answerRoutes = new Hono()
       code?: string;
       approach?: string;
       complexity?: string;
+      // cfa fields
+      analysis?: string;
+      recommendation?: string;
+      reasoning?: string;
       // block editor structured data (optional, for richer evaluation)
       blocks?: { type: string; language?: string; content: string }[];
     }>();
@@ -48,6 +52,7 @@ export const answerRoutes = new Hono()
       body.tradeoffs, body.scalingStrategy, body.rootCause, body.evidence,
       body.proposedFix, body.query, body.explanation, body.optimization,
       body.code, body.approach, body.complexity,
+      body.analysis, body.recommendation, body.reasoning,
     ];
     for (const field of textFields) {
       if (typeof field === "string" && field.length > MAX_FIELD_LEN) {
@@ -103,6 +108,14 @@ export const answerRoutes = new Hono()
         if (!code) errors.push("code is required.");
         content = { code, approach, complexity };
         if (body.blocks) content.blocks = body.blocks;
+        break;
+      }
+      case "cfa": {
+        const analysis = (body.analysis ?? "").trim();
+        const recommendation = (body.recommendation ?? "").trim();
+        const reasoning = (body.reasoning ?? "").trim();
+        if (!analysis) errors.push("analysis is required.");
+        content = { analysis, recommendation, reasoning };
         break;
       }
       default: {

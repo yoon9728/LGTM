@@ -19,6 +19,7 @@ import {
   TerminalIcon,
   TableIcon,
   PencilLineIcon,
+  ScaleIcon,
 } from "lucide-react";
 
 function scoreColor(score: number | null): string {
@@ -34,6 +35,7 @@ const CATEGORY_META: Record<string, { label: string; icon: React.ReactNode }> = 
   debugging: { label: "Debug", icon: <TerminalIcon className="size-3.5" /> },
   data_analysis: { label: "Data", icon: <TableIcon className="size-3.5" /> },
   practical_coding: { label: "Coding", icon: <PencilLineIcon className="size-3.5" /> },
+  cfa: { label: "CFA", icon: <ScaleIcon className="size-3.5" /> },
 };
 
 const FILTER_OPTIONS = [
@@ -43,6 +45,7 @@ const FILTER_OPTIONS = [
   { id: "debugging", label: "Debug" },
   { id: "data_analysis", label: "Data" },
   { id: "practical_coding", label: "Coding" },
+  { id: "cfa", label: "CFA" },
 ] as const;
 
 export default function HistoryPage() {

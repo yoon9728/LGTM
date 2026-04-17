@@ -33,6 +33,7 @@ const CATEGORY_LABELS: Record<string, string> = {
   debugging: "Debugging",
   data_analysis: "Data Analysis",
   practical_coding: "Practical Coding",
+  cfa: "CFA (Canadian)",
 };
 
 const CATEGORY_COLORS: Record<string, string> = {
@@ -41,6 +42,7 @@ const CATEGORY_COLORS: Record<string, string> = {
   debugging: "text-amber-500",
   data_analysis: "text-emerald-500",
   practical_coding: "text-rose-500",
+  cfa: "text-cyan-500",
 };
 
 type Step = "loading" | "diff" | "analysis" | "result";
@@ -71,6 +73,10 @@ export default function SessionPage({ params }: { params: Promise<{ id: string }
   // Data Analysis fields
   const [explanation, setExplanation] = useState("");
   const [optimization, setOptimization] = useState("");
+  // CFA fields
+  const [analysis, setAnalysis] = useState("");
+  const [recommendation, setRecommendation] = useState("");
+  const [reasoning, setReasoning] = useState("");
   // Practical Coding fields (block editor)
   const [codeBlocks, setCodeBlocks] = useState<Block[]>(() => [
     { id: crypto.randomUUID(), type: "code", language: "javascript", content: "" },
@@ -200,6 +206,8 @@ export default function SessionPage({ params }: { params: Promise<{ id: string }
           complexity,
           blocks: codeBlocks.map(({ type, language, content }) => ({ type, language, content })),
         };
+      case "cfa":
+        return { ...base, analysis, recommendation, reasoning };
       default: // code_review
         return {
           ...base,
@@ -208,7 +216,7 @@ export default function SessionPage({ params }: { params: Promise<{ id: string }
           findings: findings.split("\n").map((l) => l.replace(/^\d+\.\s*/, "").trim()).filter(Boolean),
         };
     }
-  }, [session, summary, findings, overview, components, tradeoffs, scalingStrategy, rootCause, evidence, fixBlocks, queryBlocks, explanation, optimization, codeBlocks, approach, complexity, serializeBlocks]);
+  }, [session, summary, findings, overview, components, tradeoffs, scalingStrategy, rootCause, evidence, fixBlocks, queryBlocks, explanation, optimization, codeBlocks, approach, complexity, analysis, recommendation, reasoning, serializeBlocks]);
 
   const hasBlockContent = useCallback((blocks: Block[]) => {
     return blocks.some((b) => b.content.trim().length > 0);
@@ -221,9 +229,10 @@ export default function SessionPage({ params }: { params: Promise<{ id: string }
       case "debugging": return !!rootCause.trim();
       case "data_analysis": return !!(hasBlockContent(queryBlocks) || explanation.trim());
       case "practical_coding": return hasBlockContent(codeBlocks);
+      case "cfa": return !!analysis.trim();
       default: return !!summary.trim();
     }
-  }, [session, summary, overview, components, rootCause, queryBlocks, explanation, codeBlocks, hasBlockContent]);
+  }, [session, summary, overview, components, rootCause, queryBlocks, explanation, codeBlocks, analysis, hasBlockContent]);
 
   const submitAnswer = useCallback(
     async (e: React.FormEvent) => {
@@ -349,7 +358,7 @@ export default function SessionPage({ params }: { params: Promise<{ id: string }
         <h2 className="text-xl font-semibold tracking-tight">{session?.question.title}</h2>
         <p className="text-sm text-muted-foreground leading-relaxed whitespace-pre-line">{session?.question.prompt}</p>
       </div>
-      {category !== "practical_coding" && (
+      {category !== "practical_coding" && category !== "cfa" && (
         <DiffViewer diff={session?.question.diff ?? ""} />
       )}
       {step === "diff" && (
@@ -396,7 +405,8 @@ export default function SessionPage({ params }: { params: Promise<{ id: string }
             {category === "debugging" && "I've read the code — diagnose the bug"}
             {category === "data_analysis" && "I've read the problem — write my solution"}
             {category === "practical_coding" && "I've read the problem — write my code"}
-            {!["code_review", "system_design", "debugging", "data_analysis", "practical_coding"].includes(category) && "I've read the code — write my analysis"}
+            {category === "cfa" && "I've read the scenario — write my answer"}
+            {!["code_review", "system_design", "debugging", "data_analysis", "practical_coding", "cfa"].includes(category) && "I've read the code — write my analysis"}
             <ArrowRightIcon className="size-4 ml-2" />
           </Button>
         </div>
@@ -408,7 +418,7 @@ export default function SessionPage({ params }: { params: Promise<{ id: string }
     <div className="space-y-4" ref={rightPanelRef}>
       <div className="space-y-1">
         <p className="text-xs font-semibold tracking-wide uppercase text-muted-foreground">
-          02 · Your {category === "code_review" ? "Analysis" : category === "system_design" ? "Design" : category === "debugging" ? "Diagnosis" : category === "data_analysis" ? "Solution" : "Implementation"}
+          02 · Your {category === "code_review" ? "Analysis" : category === "system_design" ? "Design" : category === "debugging" ? "Diagnosis" : category === "data_analysis" ? "Solution" : category === "cfa" ? "Response" : "Implementation"}
         </p>
         <p className="text-sm text-muted-foreground">
           {category === "code_review" && "Write precisely. Vague answers score poorly."}
@@ -416,12 +426,13 @@ export default function SessionPage({ params }: { params: Promise<{ id: string }
           {category === "debugging" && "Identify the root cause with evidence. Propose a concrete fix."}
           {category === "data_analysis" && "Write your query and explain your reasoning."}
           {category === "practical_coding" && "Write clean, working code. Explain your approach."}
+          {category === "cfa" && "Identify the applicable standard or concept, recommend an action, and justify your reasoning."}
         </p>
       </div>
       <form onSubmit={submitAnswer} className="space-y-4">
 
         {/* Code Review Form */}
-        {(category === "code_review" || !["system_design", "debugging", "data_analysis", "practical_coding"].includes(category)) && (
+        {(category === "code_review" || !["system_design", "debugging", "data_analysis", "practical_coding", "cfa"].includes(category)) && (
           <>
             <div className="space-y-2">
               <label htmlFor="summary" className="text-sm font-medium text-foreground">
@@ -589,6 +600,60 @@ export default function SessionPage({ params }: { params: Promise<{ id: string }
                   onChange={(e) => setOptimization(e.target.value)}
                   placeholder="Add index on orders(user_id, created_at). For large datasets, consider..."
                   rows={3}
+                />
+              )}
+            </div>
+          </>
+        )}
+
+        {/* CFA Form */}
+        {category === "cfa" && (
+          <>
+            <div className="space-y-2">
+              <label htmlFor="analysis" className="text-sm font-medium text-foreground">
+                Analysis <span className="text-muted-foreground font-normal">— what's happening, what standard or concept applies, what the key issue is</span>
+              </label>
+              {step === "result" ? (
+                <p className="text-sm text-foreground/80 whitespace-pre-wrap bg-muted/30 rounded-lg px-4 py-3">{analysis || "—"}</p>
+              ) : (
+                <Textarea
+                  id="analysis"
+                  value={analysis}
+                  onChange={(e) => setAnalysis(e.target.value)}
+                  placeholder="This scenario implicates Standard II(A) Material Nonpublic Information because..."
+                  rows={6}
+                />
+              )}
+            </div>
+            <div className="space-y-2">
+              <label htmlFor="recommendation" className="text-sm font-medium text-foreground">
+                Recommendation <span className="text-muted-foreground font-normal">— what should be done</span>
+              </label>
+              {step === "result" ? (
+                <p className="text-sm text-foreground/80 whitespace-pre-wrap bg-muted/30 rounded-lg px-4 py-3">{recommendation || "—"}</p>
+              ) : (
+                <Textarea
+                  id="recommendation"
+                  value={recommendation}
+                  onChange={(e) => setRecommendation(e.target.value)}
+                  placeholder="Sarah should not incorporate this information in her report. She should isolate it, refrain from trading, and notify compliance..."
+                  rows={4}
+                />
+              )}
+            </div>
+            <div className="space-y-2">
+              <label htmlFor="reasoning" className="text-sm font-medium text-foreground">
+                Reasoning <span className="text-muted-foreground font-normal">— the chain from facts to conclusion</span>
+              </label>
+              {step === "result" ? (
+                <p className="text-sm text-foreground/80 whitespace-pre-wrap bg-muted/30 rounded-lg px-4 py-3">{reasoning || "—"}</p>
+              ) : (
+                <Textarea
+                  id="reasoning"
+                  value={reasoning}
+                  onChange={(e) => setReasoning(e.target.value)}
+                  placeholder="The information is (1) material — a 30% earnings beat would move the stock — and (2) nonpublic — a private conversation. Passive acquisition does not change MNPI status..."
+                  rows={5}
                 />
               )}
             </div>

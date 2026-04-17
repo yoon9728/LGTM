@@ -37,6 +37,7 @@ const CATEGORY_LABELS: Record<string, string> = {
   debugging: "Debugging",
   data_analysis: "Data Analysis",
   practical_coding: "Practical Coding",
+  cfa: "CFA (Canadian)",
 };
 
 const TYPE_LABELS: Record<string, string> = {
@@ -64,6 +65,17 @@ const TYPE_LABELS: Record<string, string> = {
   // Practical Coding
   implementation: "Implementation",
   optimization: "Optimization",
+  // CFA
+  ethics: "Ethics & Professional Standards",
+  quantitative_methods: "Quantitative Methods",
+  economics: "Economics",
+  corporate_issuers: "Corporate Issuers",
+  fsa: "Financial Statement Analysis",
+  equity: "Equity",
+  fixed_income: "Fixed Income",
+  derivatives: "Derivatives",
+  alternatives: "Alternative Investments",
+  portfolio_management: "Portfolio Management",
 };
 
 function relativeTime(dateStr: string): string {

@@ -18,6 +18,7 @@ const CATEGORY_COLORS: Record<string, string> = {
   debugging: "oklch(0.6 0.18 45)",
   data_analysis: "oklch(0.55 0.16 160)",
   practical_coding: "oklch(0.55 0.18 350)",
+  cfa: "oklch(0.55 0.18 210)",
 };
 
 interface ScoreLineChartProps {
