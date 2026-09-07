@@ -3,7 +3,9 @@ import type { NextConfig } from "next";
 const nextConfig: NextConfig = {
   agentRules: false,
   turbopack: { root: process.cwd() },
-  output: "standalone",
+  // Vercel's adapter packages the app; standalone needs traces it does not emit.
+  // Keep standalone output for the Dockerfile and other self-hosted builds.
+  output: process.env.VERCEL === "1" ? undefined : "standalone",
   async headers() {
     return [
       {

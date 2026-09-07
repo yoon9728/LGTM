@@ -140,8 +140,10 @@
   * {
     @apply border-border outline-ring/50;
   }
-  html[data-scroll-behavior="smooth"] {
-    scroll-behavior: smooth;
+  @media (prefers-reduced-motion: no-preference) {
+    html[data-scroll-behavior="smooth"] {
+      scroll-behavior: smooth;
+    }
   }
   body {
     @apply bg-background text-foreground;

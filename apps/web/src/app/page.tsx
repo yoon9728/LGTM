@@ -1,467 +1,193 @@
-"use client";
-
-import dynamic from "next/dynamic";
+import type { Metadata } from "next";
 import Link from "next/link";
-import { useEffect, useRef, useState } from "react";
-import { Button } from "@/components/ui/button";
-import { Separator } from "@/components/ui/separator";
+import { Space_Grotesk } from "next/font/google";
+import {
+  ArrowDownIcon,
+  ArrowRightIcon,
+  ArrowUpRightIcon,
+  ArrowDownLeftIcon,
+  BracesIcon,
+  CheckIcon,
+  ChevronDownIcon,
+  CodeXmlIcon,
+  DatabaseIcon,
+  GitPullRequestIcon,
+  LayersIcon,
+  ScaleIcon,
+  ScanSearchIcon,
+} from "lucide-react";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { UserButton } from "@/components/user-button";
 import { MobileNav } from "@/components/mobile-nav";
-import { warmUpApi, api } from "@/lib/api";
-import {
-  ArrowRightIcon,
-  BrainCircuitIcon,
-  TargetIcon,
-  CodeIcon,
-  ShieldCheckIcon,
-  TrendingUpIcon,
-  LayoutDashboardIcon,
-  TableIcon,
-  TerminalIcon,
-  SearchIcon,
-} from "lucide-react";
+import { LandingPreview } from "@/components/landing-preview";
+import styles from "./landing.module.css";
 
-const ParticleMesh = dynamic(
-  () => import("@/components/particle-mesh").then((m) => m.ParticleMesh),
-  { ssr: false }
-);
+const displayFont = Space_Grotesk({ subsets: ["latin"], variable: "--font-landing" });
 
-function useScrollReveal() {
-  const ref = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-    const children = el.querySelectorAll(".scroll-reveal");
-    if (children.length === 0) return;
+export const metadata: Metadata = {
+  title: "LGTM | Stop reading AI code. Start leading it.",
+  description:
+    "Practice code review, system design, debugging, data analysis, practical coding, and CFA scenarios. Explain your thinking, get specific feedback, and find your next step.",
+};
 
-    const observer = new IntersectionObserver(
-      (entries) => {
-        entries.forEach((entry, i) => {
-          if (entry.isIntersecting) {
-            const target = entry.target as HTMLElement;
-            setTimeout(() => {
-              target.classList.add("revealed");
-            }, i * 80);
-            observer.unobserve(target);
-          }
-        });
-      },
-      { threshold: 0.1, rootMargin: "0px 0px -40px 0px" }
-    );
+const practiceAreas = [
+  { icon: GitPullRequestIcon, number: "01", label: "Code review", category: "code_review", description: "Find the risk hiding in a seemingly harmless diff.", detail: "Read. Question. Review." },
+  { icon: LayersIcon, number: "02", label: "System design", category: "system_design", description: "Make the tradeoffs. Then make the case for them.", detail: "Design for the real world." },
+  { icon: ScanSearchIcon, number: "03", label: "Debugging", category: "debugging", description: "Follow the evidence from symptom to root cause.", detail: "Less guessing. More reasoning." },
+  { icon: DatabaseIcon, number: "04", label: "Data analysis", category: "data_analysis", description: "Turn queries, pipelines, and data into sound decisions.", detail: "Go beyond the numbers." },
+  { icon: CodeXmlIcon, number: "05", label: "Practical coding", category: "practical_coding", description: "Build a working solution, not just a clever one.", detail: "Implementation meets judgment." },
+  { icon: ScaleIcon, number: "06", label: "CFA practice", category: "cfa", description: "Apply financial concepts through scenarios and MCQs.", detail: "Put your knowledge to work." },
+];
 
-    children.forEach((child) => observer.observe(child));
-    return () => observer.disconnect();
-  }, []);
-  return ref;
+const steps = [
+  { number: "01", title: "Pick your challenge.", description: "Choose a practice area and a scenario. Start with the skill you want to sharpen, not a syllabus to finish." },
+  { number: "02", title: "Show your thinking.", description: "Review a diff, explain a design, write code, or work through a question. Make your reasoning visible." },
+  { number: "03", title: "Find your next step.", description: "Get feedback on your response. See what held up, what needs work, and where to focus next." },
+];
+
+const faqs = [
+  { question: "Can I try it without an account?", answer: "Yes. Guest practice gives you access to a selection of scenarios, subject to a daily session limit. Create an account to access the broader question library and keep your practice history in one place." },
+  { question: "Is this for interviews or everyday work?", answer: "Both. LGTM focuses on explaining decisions, identifying risks, and reasoning through tradeoffs. Use it to prepare for technical interviews or to practice the kinds of decisions you encounter on the job." },
+  { question: "How does the feedback work?", answer: "Written responses are evaluated by AI against scenario-specific criteria, with feedback on your reasoning and coverage. CFA multiple-choice questions use answer-key scoring. AI feedback can be imperfect, so use it as a learning aid, not a definitive assessment of your ability." },
+  { question: "Do I need to be a senior engineer?", answer: "No. Pick a topic and difficulty that fit where you are now. The goal is to improve how you approach a problem, not to prove that you already know everything. Data analysis and CFA practice also extend beyond software engineering." },
+];
+
+function Brand() {
+  return (
+    <Link href="/" className={styles.brand} aria-label="LGTM home">
+      <span className={styles.brandMark} aria-hidden="true"><BracesIcon /><CheckIcon /></span>
+      LGTM<span className={styles.beta}>BETA</span>
+    </Link>
+  );
 }
 
-const scenarioCards = [
-  {
-    icon: CodeIcon,
-    label: "Code Review",
-    desc: "Read a diff, find the bugs, explain the risk",
-    tag: "LIVE",
-    href: "/practice/code_review",
-  },
-  {
-    icon: LayoutDashboardIcon,
-    label: "System Design",
-    desc: "Architect a system, defend your tradeoffs",
-    tag: "LIVE",
-    href: "/practice/system_design",
-  },
-  {
-    icon: TerminalIcon,
-    label: "Debugging",
-    desc: "Read logs, trace the root cause, propose a fix",
-    tag: "LIVE",
-    href: "/practice/debugging",
-  },
-  {
-    icon: TableIcon,
-    label: "Data Analysis",
-    desc: "SQL queries, pipelines, dimensional modeling",
-    tag: "LIVE",
-    href: "/practice/data_analysis",
-  },
-  {
-    icon: SearchIcon,
-    label: "Practical Coding",
-    desc: "Implement real systems in Python, Java, Rust, Go, and more",
-    tag: "LIVE",
-    href: "/practice/practical_coding",
-  },
-  {
-    icon: BrainCircuitIcon,
-    label: "More coming",
-    desc: "Excel, PowerBI, incident response, capacity planning",
-    tag: "",
-    href: "",
-  },
-];
-
-const howItWorks = [
-  {
-    step: "01",
-    icon: TargetIcon,
-    title: "Get a scenario",
-    desc: "A real-world problem — a diff to review, a system to design, data to analyze. The kind of work you'd do on the job.",
-  },
-  {
-    step: "02",
-    icon: CodeIcon,
-    title: "Write your analysis",
-    desc: "No multiple choice. Explain your reasoning, identify risks, propose solutions. Write it like a senior would.",
-  },
-  {
-    step: "03",
-    icon: BrainCircuitIcon,
-    title: "Get AI evaluation",
-    desc: "Scored against expert rubrics with criterion-level coverage. See what you caught, what you missed, and what to practice next.",
-  },
-];
-
-const skills = [
-  {
-    icon: ShieldCheckIcon,
-    label: "Risk identification",
-    detail: "Security holes, data leaks, failure modes, scaling bottlenecks",
-  },
-  {
-    icon: TargetIcon,
-    label: "Root cause analysis",
-    detail: "Finding the real problem, not just the symptom",
-  },
-  {
-    icon: TrendingUpIcon,
-    label: "Tradeoff reasoning",
-    detail: "Weighing options, explaining why one approach beats another",
-  },
-  {
-    icon: BrainCircuitIcon,
-    label: "Clear communication",
-    detail:
-      "Structured findings, actionable recommendations, evidence-based",
-  },
-];
-
 export default function LandingPage() {
-  const scenarioRef = useScrollReveal();
-  const howRef = useScrollReveal();
-  const skillsRef = useScrollReveal();
-  const evalRef = useScrollReveal();
-
-  const [landingStats, setLandingStats] = useState<{ categories: number; questions: number } | null>(null);
-
-  // Wake up API + fetch stats for landing page
-  useEffect(() => {
-    warmUpApi();
-    api.getQuestions().then((res) => {
-      const cats = new Set(res.questions.map((q) => q.category));
-      setLandingStats({ categories: cats.size, questions: res.questions.length });
-    }).catch(() => {});
-  }, []);
-
   return (
-    <div className="min-h-dvh flex flex-col">
-      {/* Nav */}
-      <nav className="fixed top-0 left-0 right-0 z-50 border-b border-border/50 bg-background/80 backdrop-blur-md">
-        <div className="max-w-6xl mx-auto px-6 flex items-center justify-between h-14">
-          <div className="flex items-center gap-3">
-            <span className="text-sm font-bold tracking-[0.12em] font-mono">
-              LGTM
-            </span>
-            <span className="text-[10px] text-muted-foreground font-mono tracking-wide border border-border rounded px-1.5 py-0.5">
-              BETA
-            </span>
-          </div>
-          <div className="flex items-center gap-2">
+    <div className={`${styles.landing} ${displayFont.variable}`}>
+      <a href="#main-content" className={styles.skipLink}>Skip to content</a>
+      <header className={styles.header}>
+        <div className={`${styles.container} ${styles.headerInner}`}>
+          <Brand />
+          <nav className={styles.desktopNav} aria-label="Main navigation">
+            <a href="#practice-areas">Practice areas</a>
+            <a href="#how-it-works">How it works</a>
+            <a href="#faq">FAQ</a>
+          </nav>
+          <div className={styles.headerActions}>
             <ThemeToggle />
             <UserButton />
-            <Link href="/practice" className="hidden md:inline-flex">
-              <Button size="sm">
-                Start practicing
-                <ArrowRightIcon className="size-3.5 ml-1" />
-              </Button>
-            </Link>
+            <Link href="/practice" className={`${styles.primaryButton} ${styles.headerCta}`}>Start practicing <ArrowUpRightIcon aria-hidden="true" /></Link>
             <MobileNav />
           </div>
         </div>
-      </nav>
+      </header>
 
-      {/* Hero */}
-      <section className="relative flex-1 flex items-center overflow-hidden min-h-[100dvh] noise-overlay radial-depth">
-        <ParticleMesh className="absolute inset-0 w-full h-full" />
-
-        <div className="relative z-10 max-w-6xl mx-auto px-6 py-24 sm:py-32 w-full flex flex-col items-center text-center">
-          <p className="animate-fade-in-up stagger-1 text-xs font-mono font-medium tracking-widest uppercase text-primary mb-6">
-            AI-powered practice platform
-          </p>
-
-          <h1
-            className="animate-fade-in-up stagger-2 font-bold tracking-tight leading-[1.05]"
-            style={{ fontSize: "clamp(3rem, 6vw, 5.5rem)" }}
-          >
-            Stop reading AI code.
-          </h1>
-
-          <h1
-            className="animate-fade-in-up stagger-3 font-bold tracking-tight leading-[1.05] mt-2"
-            style={{ fontSize: "clamp(3rem, 6vw, 5.5rem)" }}
-          >
-            Start{" "}
-            <span className="gradient-text">leading</span> it.
-          </h1>
-
-          <p className="animate-fade-in-up stagger-3 text-lg sm:text-xl text-muted-foreground leading-relaxed max-w-2xl mt-8">
-            Practice code review, system design, and debugging with real
-            scenarios — scored by expert rubrics, not vibes.
-          </p>
-
-          <div className="animate-fade-in-up stagger-4 flex flex-col sm:flex-row items-center gap-4 mt-10">
-            <Link href="/practice">
-              <Button size="lg" className="btn-glow text-sm h-12 px-6 cursor-pointer">
-                Start a session
-                <ArrowRightIcon className="size-4 ml-2" />
-              </Button>
-            </Link>
-            <div className="flex items-center gap-3 text-xs text-muted-foreground font-mono">
-              <span>~10 min</span>
-              <span className="size-1 rounded-full bg-border" />
-              <span>AI-graded</span>
-              <span className="size-1 rounded-full bg-border" />
-              <span>No signup</span>
+      <main id="main-content">
+        <section className={styles.hero} aria-labelledby="hero-title">
+          <div className={`${styles.container} ${styles.heroGrid}`}>
+            <div className={styles.heroCopy}>
+              <p className={styles.eyebrow}><span className={styles.statusDot} />LESS MEMORIZING. MORE UNDERSTANDING.</p>
+              <h1 id="hero-title">Stop reading AI code.<br />Start <span className={styles.highlight}>leading</span> it.</h1>
+              <p className={styles.heroDescription}>Knowing the answer is one thing. Knowing <strong>why</strong> is another. Practice real-world scenarios and get feedback that helps you think one step further.</p>
+              <div className={styles.heroActions}>
+                <Link href="/practice" className={styles.primaryButton}>Start practicing <ArrowUpRightIcon aria-hidden="true" /></Link>
+                <a href="#product-preview" className={styles.textButton}>Explore an example <ArrowDownIcon aria-hidden="true" /></a>
+              </div>
+              <p className={styles.guestNote}><CheckIcon aria-hidden="true" /> Try guest practice. No account needed.</p>
+              <div className={styles.heroFootnote}><span className={styles.miniLine} />A practice space for your next &ldquo;here&apos;s why.&rdquo;</div>
+            </div>
+            <div className={styles.previewStage}>
+              <div className={styles.stageLabel}><span>ONE SMALL DIFF. ONE BIG QUESTION.</span><ArrowDownLeftIcon aria-hidden="true" /></div>
+              <LandingPreview />
+              <div className={styles.previewCaption}><span className={styles.statusDot} />A sample, not a live evaluation. Try both views.</div>
             </div>
           </div>
-        </div>
-      </section>
-
-      {/* Problem types + How it works — combined denser section */}
-      <section className="bg-card/30 border-y border-border/30" ref={scenarioRef}>
-        <div className="max-w-6xl mx-auto px-6 py-16">
-          <div className="flex items-center justify-between mb-8">
-            <p className="scroll-reveal text-xs font-mono font-medium tracking-widest uppercase text-muted-foreground">
-              Multi-domain scenarios
-            </p>
-            <p className="scroll-reveal text-xs text-muted-foreground">
-              {landingStats
-                ? `${landingStats.categories} categories · ${landingStats.questions} questions`
-                : "Loading..."}
-            </p>
+          <div className={`${styles.container} ${styles.proofStrip}`}>
+            <div><span className={styles.proofNumber}>06</span><span>practice areas.<br /><strong>One sharper you.</strong></span></div>
+            <p>Real-world scenarios</p><span aria-hidden="true">+</span><p>Your own reasoning</p><span aria-hidden="true">+</span><p>Specific feedback</p>
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-            {scenarioCards.map((item) => {
-              const inner = (
-                <div
-                  className="scroll-reveal card-glow group flex items-start gap-4 p-5 rounded-xl cursor-pointer"
-                >
-                  <div className="size-9 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
-                    <item.icon className="size-4 text-primary" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <p className="text-sm font-medium text-foreground group-hover:text-primary transition-colors">
-                        {item.label}
-                      </p>
-                      {item.tag && (
-                        <span
-                          className={`text-[9px] font-mono font-bold tracking-wider px-1.5 py-0.5 rounded ${
-                            item.tag === "LIVE"
-                              ? "bg-diff-add/15 text-diff-add-fg"
-                              : "bg-muted text-muted-foreground"
-                          }`}
-                        >
-                          {item.tag}
-                        </span>
-                      )}
-                    </div>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      {item.desc}
-                    </p>
-                  </div>
-                </div>
-              );
-              return item.href ? (
-                <Link key={item.label} href={item.href}>{inner}</Link>
-              ) : (
-                <div key={item.label}>{inner}</div>
-              );
-            })}
-          </div>
-        </div>
-      </section>
+        </section>
 
-      {/* How it works — tighter layout */}
-      <section ref={howRef}>
-        <div className="max-w-6xl mx-auto px-6 py-16">
-          <p className="scroll-reveal text-xs font-mono font-medium tracking-widest uppercase text-muted-foreground mb-8">
-            How it works
-          </p>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            {howItWorks.map((s) => (
-              <div
-                key={s.step}
-                className="scroll-reveal card-glow group space-y-3 p-5 rounded-xl"
-              >
-                <div className="flex items-center gap-3">
-                  <span className="text-lg font-mono font-bold text-primary/60">
-                    {s.step}
-                  </span>
-                  <s.icon className="size-4 text-muted-foreground group-hover:text-foreground transition-colors" />
-                </div>
-                <h3 className="text-base font-semibold tracking-tight">
-                  {s.title}
-                </h3>
-                <p className="text-sm text-muted-foreground leading-relaxed">
-                  {s.desc}
-                </p>
-              </div>
+        <section id="practice-areas" className={`${styles.container} ${styles.section}`} aria-labelledby="areas-title">
+          <div className={styles.sectionHeading}>
+            <div><p className={styles.eyebrow}>FIND YOUR PRACTICE</p><h2 id="areas-title">Different challenges.<br />Same muscle: judgment.</h2></div>
+            <p>From your next pull request to your next financial case. Choose where you want to get better.</p>
+          </div>
+          <div className={styles.areaGrid}>
+            {practiceAreas.map(({ icon: Icon, ...area }) => (
+              <Link key={area.category} href={`/practice/${area.category}`} className={styles.areaLink}>
+                <div className={styles.areaTop}><Icon aria-hidden="true" /><span>{area.number} /</span></div>
+                <h3>{area.label}<ArrowUpRightIcon aria-hidden="true" /></h3>
+                <p>{area.description}</p>
+                <span className={styles.areaDetail}>{area.detail}</span>
+              </Link>
             ))}
           </div>
-        </div>
-      </section>
+        </section>
 
-      {/* What you practice + Evaluation preview — combined */}
-      <section className="bg-card/30 border-y border-border/30" ref={skillsRef}>
-        <div className="max-w-6xl mx-auto px-6 py-16">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
-            <div className="space-y-6 scroll-reveal">
-              <p className="text-xs font-mono font-medium tracking-widest uppercase text-muted-foreground">
-                What you build
-              </p>
-              <h2 className="text-3xl sm:text-4xl font-bold tracking-tight leading-tight">
-                The judgment that
-                <br />
-                separates senior from junior.
-              </h2>
-              <p className="text-muted-foreground leading-relaxed">
-                Not memorization. Not syntax. The ability to read a situation,
-                identify what matters, and explain why — across any domain.
-              </p>
+        <section id="how-it-works" className={styles.processSection} aria-labelledby="process-title">
+          <div className={`${styles.container} ${styles.section}`}>
+            <div className={styles.sectionHeading}>
+              <div><p className={styles.eyebrow}>A SIMPLE PRACTICE LOOP</p><h2 id="process-title">Think it through.<br />Then go a little deeper.</h2></div>
+              <Link href="/practice" className={styles.textButton}>Find your first challenge <ArrowRightIcon aria-hidden="true" /></Link>
             </div>
-            <div className="space-y-3">
-              {skills.map((item) => (
-                <div
-                  key={item.label}
-                  className="scroll-reveal card-glow flex items-start gap-4 p-4 rounded-lg"
-                >
-                  <item.icon className="size-5 text-primary mt-0.5 shrink-0" />
-                  <div>
-                    <p className="text-sm font-medium text-foreground">
-                      {item.label}
-                    </p>
-                    <p className="text-xs text-muted-foreground mt-0.5">
-                      {item.detail}
-                    </p>
-                  </div>
+            <div className={styles.steps}>
+              {steps.map((step) => (
+                <div className={styles.step} key={step.number}>
+                  <span className={styles.stepNumber}>{step.number}<ArrowRightIcon aria-hidden="true" /></span>
+                  <h3>{step.title}</h3><p>{step.description}</p>
                 </div>
               ))}
             </div>
           </div>
-        </div>
-      </section>
+        </section>
 
-      {/* Evaluation preview */}
-      <section ref={evalRef}>
-        <div className="max-w-6xl mx-auto px-6 py-16">
-          <div className="text-center space-y-4 mb-10 scroll-reveal">
-            <p className="text-xs font-mono font-medium tracking-widest uppercase text-muted-foreground">
-              Not just a score
-            </p>
-            <h2 className="text-3xl sm:text-4xl font-bold tracking-tight">
-              Feedback that makes you better.
-            </h2>
-            <p className="text-muted-foreground max-w-lg mx-auto">
-              Every evaluation breaks down what you caught, what you missed,
-              and gives you a concrete next step. No black-box grades.
-            </p>
-          </div>
-          {/* Fake evaluation card */}
-          <div className="scroll-reveal max-w-2xl mx-auto rounded-xl overflow-hidden card-glow">
-            <div className="p-6 border-b border-border/50">
-              <div className="flex items-baseline gap-3">
-                <span className="text-4xl font-bold font-mono text-primary">
-                  72
-                </span>
-                <span className="text-sm text-muted-foreground">/ 100</span>
-              </div>
-              <div className="mt-3 h-1.5 rounded-full bg-border overflow-hidden">
-                <div
-                  className="h-full rounded-full bg-primary"
-                  style={{ width: "72%" }}
-                />
-              </div>
+        <section className={`${styles.container} ${styles.feedbackSection}`} aria-labelledby="feedback-title">
+          <div className={styles.feedbackVisual}>
+            <div className={styles.visualHeading}><span>THE FEEDBACK LOOP</span><span aria-hidden="true">[ + ]</span></div>
+            <p className={styles.visualStatement}>Not just<br /><span>&ldquo;looks good.&rdquo;</span></p>
+            <div className={styles.feedbackRows}>
+              <div><span className={styles.caughtDot} /><strong>What you caught</strong><CheckIcon aria-hidden="true" /></div>
+              <div><span className={styles.missedDot} /><strong>What you missed</strong><span aria-hidden="true">+</span></div>
+              <div><span className={styles.nextDot} /><strong>What to try next</strong><ArrowUpRightIcon aria-hidden="true" /></div>
             </div>
-            <div className="p-6 space-y-4">
-              <div className="space-y-2">
-                <p className="text-xs font-mono font-semibold tracking-wide uppercase text-muted-foreground">
-                  Criteria
-                </p>
-                {[
-                  { label: "Identified the core risk", status: "covered" },
-                  { label: "Explained downstream impact", status: "covered" },
-                  {
-                    label: "Proposed mitigation strategy",
-                    status: "missing",
-                  },
-                ].map((c) => (
-                  <div key={c.label} className="flex items-center gap-2">
-                    <span
-                      className={`text-[10px] font-mono font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded ${
-                        c.status === "covered"
-                          ? "bg-diff-add/15 text-diff-add-fg"
-                          : "bg-diff-remove/15 text-diff-remove-fg"
-                      }`}
-                    >
-                      {c.status}
-                    </span>
-                    <span className="text-sm text-foreground">{c.label}</span>
-                  </div>
-                ))}
-              </div>
-              <Separator />
-              <div className="text-sm text-muted-foreground leading-relaxed italic">
-                &ldquo;Strong analysis of the risk and its blast radius. To
-                push past 80, include a concrete mitigation plan — what
-                specifically should change and why.&rdquo;
-              </div>
-            </div>
+            <span className={styles.visualCaption}>A clearer next step beats a number alone.</span>
           </div>
-        </div>
-      </section>
-
-      {/* CTA */}
-      <section className="bg-card/30 border-t border-border/30">
-        <div className="max-w-6xl mx-auto px-6 py-16 text-center space-y-6">
-          <h2 className="text-3xl sm:text-4xl font-bold tracking-tight">
-            Ready to practice?
-          </h2>
-          <p className="text-muted-foreground max-w-md mx-auto">
-            No account needed. Pick up a scenario, write your analysis, and
-            see how you score. Takes about 10 minutes.
-          </p>
-          <Link href="/practice">
-            <Button size="lg" className="btn-glow text-sm h-12 px-6 mt-2 cursor-pointer">
-              Start your first session
-              <ArrowRightIcon className="size-4 ml-2" />
-            </Button>
-          </Link>
-        </div>
-      </section>
-
-      {/* Footer */}
-      <footer className="border-t border-border/50">
-        <div className="max-w-6xl mx-auto px-6 py-6 flex items-center justify-between">
-          <div className="flex items-center gap-2 text-xs text-muted-foreground">
-            <span className="font-mono font-bold">LGTM</span>
-            <span className="size-1 rounded-full bg-border" />
-            <span>&copy; 2026</span>
+          <div className={styles.feedbackCopy}>
+            <p className={styles.eyebrow}>MAKE EVERY ATTEMPT COUNT</p>
+            <h2 id="feedback-title">The useful part<br />is what comes next.</h2>
+            <p>A score can tell you where you landed. Specific feedback helps you decide where to go.</p>
+            <ul className={styles.benefits}>
+              <li><CheckIcon aria-hidden="true" /><span><strong>See the gaps in your reasoning.</strong> Scenario-level criteria make the feedback easier to act on.</span></li>
+              <li><CheckIcon aria-hidden="true" /><span><strong>Build on what you got right.</strong> Recognize your strengths, not just your mistakes.</span></li>
+              <li><CheckIcon aria-hidden="true" /><span><strong>Keep your practice in perspective.</strong> Sign in to revisit your history and explore your dashboard.</span></li>
+            </ul>
+            <Link href="/practice" className={styles.textButton}>Put your thinking to the test <ArrowRightIcon aria-hidden="true" /></Link>
           </div>
-          <p className="text-xs text-muted-foreground">
-            AI-powered practice platform
-          </p>
-        </div>
+        </section>
+
+        <section id="faq" className={`${styles.container} ${styles.faqSection}`} aria-labelledby="faq-title">
+          <div><p className={styles.eyebrow}>BEFORE YOU JUMP IN</p><h2 id="faq-title">Good questions.</h2><p className={styles.faqIntro}>A few things worth knowing before your first scenario.</p></div>
+          <div className={styles.faqList}>
+            {faqs.map((faq) => (
+              <details key={faq.question} className={styles.faqItem}>
+                <summary>{faq.question}<ChevronDownIcon aria-hidden="true" /></summary><p>{faq.answer}</p>
+              </details>
+            ))}
+          </div>
+        </section>
+
+        <section className={styles.closingSection} aria-labelledby="closing-title">
+          <div className={`${styles.container} ${styles.closingInner}`}>
+            <div><p className={styles.eyebrow}>LESS SCROLLING. MORE SOLVING.</p><h2 id="closing-title">Your next good decision<br />starts with practice.</h2><p>Pick one scenario. See where your thinking takes you.</p></div>
+            <div className={styles.closingAction}><Link href="/practice" className={styles.primaryButton}>Find your first challenge <ArrowUpRightIcon aria-hidden="true" /></Link><span>Guest practice available. No account needed.</span></div>
+          </div>
+        </section>
+      </main>
+
+      <footer className={`${styles.container} ${styles.footer}`}>
+        <div><Brand /><span>Practice the thinking behind the work.</span></div>
+        <nav aria-label="Footer navigation"><Link href="/practice">Practice</Link><a href="#faq">FAQ</a><span>&copy; 2026 LGTM</span></nav>
       </footer>
     </div>
   );

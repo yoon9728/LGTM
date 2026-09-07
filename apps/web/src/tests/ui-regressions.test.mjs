@@ -29,6 +29,8 @@ function load(file, dependencies = {}, globals = {}) {
       if (id === "react/jsx-runtime") return { jsx, jsxs: jsx, Fragment: "Fragment" };
       if (id === "next/link") return { default: "Link", __esModule: true };
       if (id === "next/dynamic") return { default: () => "Dynamic", __esModule: true };
+      if (id === "next/font/google") return { Space_Grotesk: () => ({ variable: "landing-font" }) };
+      if (id.endsWith("landing.module.css")) return { default: new Proxy({}, { get: (_, key) => key }), __esModule: true };
       if (id === "@/lib/utils") return { cn: (...parts) => parts.filter(Boolean).join(" ") };
       if (id === "@/lib/guest") return { GUEST_LIMIT: 4, useGuestSessionCount: () => 0 };
       if (id === "@/components/theme-provider") return { useTheme: () => ({ theme: "dark" }) };
@@ -456,4 +458,52 @@ test("result reads and warmup stay on the same-origin proxy without a POST", asy
     { url: "/api/v1/practice/sessions/s/result", method: "GET" },
     { url: "/api/v1/health", method: "GET" },
   ]);
+});
+
+test("landing has one main heading, all six practice routes, and no question-count request", () => {
+  const landing = load("app/page.tsx");
+  const tree = landing.default();
+  assert.equal(findAll(tree, (node) => node.type === "h1").length, 1);
+  const headline = findAll(tree, (node) => node.type === "h1")[0];
+  assert.equal(text(headline).replace(/\s+/g, " ").trim(), "Stop reading AI code. Start leading it.");
+  const areaLinks = findAll(tree, (node) => node.type === "Link" && node.props.href.startsWith("/practice/"));
+  assert.deepEqual(areaLinks.map((node) => node.props.href).sort(), [
+    "/practice/cfa", "/practice/code_review", "/practice/data_analysis",
+    "/practice/debugging", "/practice/practical_coding", "/practice/system_design",
+  ]);
+  assert.match(landing.metadata.description, /CFA/);
+  assert.doesNotMatch(text(tree), /Loading\.\.\.|More coming|expert rubrics|No multiple choice/);
+});
+
+test("landing FAQ discloses guest limits and AI limitations and anchors resolve", () => {
+  const tree = load("app/page.tsx").default();
+  const details = findAll(tree, (node) => node.type === "details");
+  assert.equal(details.length, 4);
+  assert.match(text(details), /daily session limit/);
+  assert.match(text(details), /AI feedback can be imperfect/);
+  assert.match(text(details), /answer-key scoring/);
+  const ids = new Set(findAll(tree, (node) => node.props?.id).map((node) => node.props.id));
+  ids.add("product-preview"); // The client preview owns this anchor.
+  for (const anchor of findAll(tree, (node) => node.type === "a" && node.props.href.startsWith("#"))) {
+    assert.ok(ids.has(anchor.props.href.slice(1)), `Unresolved landing anchor: ${anchor.props.href}`);
+  }
+});
+
+test("landing example switches both ways without making an API request", () => {
+  const harness = createHarness("components/landing-preview.tsx", {}, guest, "LandingPreview");
+  let tree = harness.render();
+  assert.match(text(tree), /EXAMPLE PREVIEW/);
+  assert.match(text(tree), /Would you approve this/);
+  assert.equal(button(tree, "The scenario").props["aria-pressed"], true);
+  assert.equal(button(tree, "The feedback").props["aria-pressed"], false);
+  assert.equal(findAll(tree, (node) => node.type === "pre")[0].props.tabIndex, 0);
+  button(tree, "Reveal example feedback").props.onClick();
+  tree = harness.render();
+  assert.match(text(tree), /2 of 3 covered/);
+  assert.match(text(tree), /Proposed a concrete fix and test/);
+  assert.match(text(tree), /Scope the lookup to the current user/);
+  assert.equal(button(tree, "The feedback").props["aria-pressed"], true);
+  assert.equal(findAll(tree, (node) => node.props?.id === "example-content")[0].props["aria-live"], "polite");
+  button(tree, "Revisit the scenario").props.onClick();
+  assert.match(text(harness.render()), /Would you approve this/);
 });
