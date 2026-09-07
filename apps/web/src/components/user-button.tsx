@@ -1,9 +1,10 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { useSession, signOut } from "@/lib/auth-client";
 import { Button } from "@/components/ui/button";
-import { UserIcon, LogOutIcon, ArrowRightIcon, BarChart3Icon } from "lucide-react";
+import { LogOutIcon, ArrowRightIcon, BarChart3Icon } from "lucide-react";
 import { useState, useRef, useEffect } from "react";
 
 export function UserButton() {
@@ -54,8 +55,11 @@ export function UserButton() {
         className="size-8 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-xs font-medium hover:opacity-90 transition-opacity overflow-hidden"
       >
         {user.image && !imgError ? (
-          <img
+          <Image
             src={user.image}
+            width={32}
+            height={32}
+            unoptimized
             alt={user.name ?? ""}
             className="size-8 rounded-full object-cover"
             referrerPolicy="no-referrer"

@@ -8,7 +8,7 @@ import { signIn } from "@/lib/auth-client";
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { LoadingDots } from "@/components/loading-spinner";
-import { MailIcon, ArrowRightIcon } from "lucide-react";
+import { ArrowRightIcon } from "lucide-react";
 
 const ParticleMesh = dynamic(
   () => import("@/components/particle-mesh").then((m) => m.ParticleMesh),

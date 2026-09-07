@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useRef, useEffect } from "react";
+import { useState } from "react";
 import dynamic from "next/dynamic";
 import { Button } from "@/components/ui/button";
 import { useTheme } from "@/components/theme-provider";
@@ -41,6 +41,7 @@ interface BlockEditorProps {
   onChange: (blocks: Block[]) => void;
   defaultLanguage?: string;
   templates?: Record<string, string>;
+  disabled?: boolean;
 }
 
 export function BlockEditor({
@@ -48,73 +49,64 @@ export function BlockEditor({
   onChange,
   defaultLanguage,
   templates,
+  disabled = false,
 }: BlockEditorProps) {
   const { theme } = useTheme();
   const [showLanguageMenu, setShowLanguageMenu] = useState<string | null>(null);
-  // Use a ref to always have the latest blocks for callbacks
-  const blocksRef = useRef(blocks);
-  blocksRef.current = blocks;
-
-  const onChangeRef = useRef(onChange);
-  onChangeRef.current = onChange;
-
-  const updateBlock = useCallback((id: string, content: string) => {
-    const updated = blocksRef.current.map((b) =>
+  const updateBlock = (id: string, content: string) => {
+    if (disabled) return;
+    const updated = blocks.map((b) =>
       b.id === id ? { ...b, content } : b
     );
-    onChangeRef.current(updated);
-  }, []);
+    onChange(updated);
+  };
 
-  const templatesRef = useRef(templates);
-  templatesRef.current = templates;
-
-  const updateBlockLanguage = useCallback((id: string, language: string) => {
-    const tpl = templatesRef.current;
-    const updated = blocksRef.current.map((b) => {
+  const updateBlockLanguage = (id: string, language: string) => {
+    if (disabled) return;
+    const updated = blocks.map((b) => {
       if (b.id !== id) return b;
-      const newContent = tpl?.[language] ?? "";
+      const newContent = templates?.[language] ?? "";
       // Swap content if it's empty or matches a previous template
-      const oldTemplate = tpl?.[b.language ?? ""] ?? "";
+      const oldTemplate = templates?.[b.language ?? ""] ?? "";
       const shouldSwap = !b.content || b.content === oldTemplate;
       return { ...b, language, ...(shouldSwap ? { content: newContent } : {}) };
     });
-    onChangeRef.current(updated);
+    onChange(updated);
     setShowLanguageMenu(null);
-  }, []);
+  };
 
-  const addBlock = useCallback(
-    (type: "text" | "code") => {
-      const newBlock: Block = {
-        id: crypto.randomUUID(),
-        type,
-        ...(type === "code"
-          ? { language: defaultLanguage ?? "javascript" }
-          : {}),
-        content: "",
-      };
-      onChangeRef.current([...blocksRef.current, newBlock]);
-    },
-    [defaultLanguage]
-  );
+  const addBlock = (type: "text" | "code") => {
+    if (disabled) return;
+    const newBlock: Block = {
+      id: crypto.randomUUID(),
+      type,
+      ...(type === "code"
+        ? { language: defaultLanguage ?? "javascript" }
+        : {}),
+      content: "",
+    };
+    onChange([...blocks, newBlock]);
+  };
 
-  const removeBlock = useCallback((id: string) => {
-    if (blocksRef.current.length <= 1) return;
-    onChangeRef.current(blocksRef.current.filter((b) => b.id !== id));
-  }, []);
+  const removeBlock = (id: string) => {
+    if (disabled || blocks.length <= 1) return;
+    onChange(blocks.filter((b) => b.id !== id));
+  };
 
-  const moveBlock = useCallback((id: string, direction: "up" | "down") => {
-    const cur = blocksRef.current;
+  const moveBlock = (id: string, direction: "up" | "down") => {
+    if (disabled) return;
+    const cur = blocks;
     const idx = cur.findIndex((b) => b.id === id);
     if (idx === -1) return;
     const newIdx = direction === "up" ? idx - 1 : idx + 1;
     if (newIdx < 0 || newIdx >= cur.length) return;
     const newBlocks = [...cur];
     [newBlocks[idx], newBlocks[newIdx]] = [newBlocks[newIdx], newBlocks[idx]];
-    onChangeRef.current(newBlocks);
-  }, []);
+    onChange(newBlocks);
+  };
 
   return (
-    <div className="space-y-3">
+    <fieldset disabled={disabled} className="min-w-0 space-y-3">
       {blocks.map((block, idx) => (
         <div key={block.id} className="group relative">
           {/* Block toolbar */}
@@ -217,6 +209,8 @@ export function BlockEditor({
                 onChange={(value) => updateBlock(block.id, value ?? "")}
                 theme={theme === "dark" ? "vs-dark" : "light"}
                 options={{
+                  readOnly: disabled,
+                  domReadOnly: disabled,
                   minimap: { enabled: false },
                   fontSize: 13,
                   lineNumbers: "on",
@@ -258,6 +252,6 @@ export function BlockEditor({
           Add code
         </Button>
       </div>
-    </div>
+    </fieldset>
   );
 }

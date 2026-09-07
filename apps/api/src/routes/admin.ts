@@ -4,14 +4,31 @@ import { getPgDb } from "../db/index.js";
 import { questions as questionsTable } from "../db/schema.js";
 import { requireAuth, type AuthUser } from "../middleware/auth.js";
 import { generateRubric } from "../services/rubric-generator.js";
-import { invalidate as invalidateRubricCache, warmUp as warmUpRubricCache } from "../services/rubric-store.js";
-import type { Question } from "../data/questions.js";
+import { invalidate as invalidateRubricCache } from "../services/rubric-store.js";
 
 // Admin emails — in production, use a role-based system
-const ADMIN_EMAILS = (process.env.ADMIN_EMAILS ?? "").split(",").map((e) => e.trim()).filter(Boolean);
+export function isAdmin(user: AuthUser): boolean {
+  const emails = (process.env.ADMIN_EMAILS ?? "").split(",").map((e) => e.trim().toLowerCase()).filter(Boolean);
+  return user.emailVerified === true && emails.includes(user.email.toLowerCase());
+}
 
-function isAdmin(user: AuthUser): boolean {
-  return ADMIN_EMAILS.includes(user.email);
+export function validAdminInput(value: unknown): boolean {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const body = value as Record<string, unknown>;
+  for (const key of ["id", "category", "type", "language", "title", "prompt", "diff", "difficulty"]) {
+    if (body[key] !== undefined && (typeof body[key] !== "string" || body[key].length > 50_000)) return false;
+  }
+  if (body.save !== undefined && typeof body.save !== "boolean") return false;
+  if (body.tags !== undefined && (!Array.isArray(body.tags) || body.tags.length > 100 || body.tags.some((tag) => typeof tag !== "string" || tag.length > 200))) return false;
+  if (body.rubric !== undefined) {
+    if (!body.rubric || typeof body.rubric !== "object" || Array.isArray(body.rubric)) return false;
+    const rubric = body.rubric as Record<string, unknown>;
+    for (const key of ["mustCover", "strongSignals", "weakPatterns"]) {
+      const entries = rubric[key];
+      if (!Array.isArray(entries) || entries.length > 50 || entries.some((entry) => typeof entry !== "string" || !entry.trim() || entry.length > 5_000)) return false;
+    }
+  }
+  return true;
 }
 
 export const adminRoutes = new Hono()
@@ -20,6 +37,13 @@ export const adminRoutes = new Hono()
     const user = c.get("user") as AuthUser;
     if (!isAdmin(user)) {
       return c.json({ error: "Admin access required" }, 403);
+    }
+    await next();
+  })
+  .use("*", async (c, next) => {
+    if (["POST", "PUT"].includes(c.req.method)) {
+      const body: unknown = await c.req.json().catch(() => undefined);
+      if (!validAdminInput(body)) return c.json({ error: "Invalid admin input" }, 400);
     }
     await next();
   })
@@ -94,6 +118,7 @@ export const adminRoutes = new Hono()
           .update(questionsTable)
           .set({ rubric })
           .where(eq(questionsTable.id, id));
+        invalidateRubricCache(id);
       }
 
       return c.json({ ok: true, rubric, saved: shouldSave });
@@ -144,9 +169,8 @@ export const adminRoutes = new Hono()
           language: body.language,
         });
         rubricGenerated = true;
-      } catch (err) {
-        const msg = err instanceof Error ? err.message : "Unknown error";
-        return c.json({ error: `Auto rubric generation failed: ${msg}` }, 500);
+      } catch {
+        return c.json({ error: "Auto rubric generation failed. Please try again." }, 502);
       }
     }
 
@@ -214,7 +238,8 @@ export const adminRoutes = new Hono()
     }
 
     // If content fields changed, auto-regenerate rubric
-    const contentChanged = body.prompt !== undefined || body.diff !== undefined || body.title !== undefined;
+    const contentChanged = body.prompt !== undefined || body.diff !== undefined || body.title !== undefined
+      || body.category !== undefined || body.type !== undefined || body.language !== undefined;
     let rubricRegenerated = false;
 
     if (contentChanged && !body.rubric) {
@@ -230,9 +255,8 @@ export const adminRoutes = new Hono()
         });
         updates.rubric = rubric;
         rubricRegenerated = true;
-      } catch (err) {
-        console.error("Auto rubric regeneration failed:", err);
-        // Continue without rubric update — don't block the question update
+      } catch {
+        return c.json({ error: "Rubric regeneration failed. The question was not changed." }, 502);
       }
     }
 
@@ -244,11 +268,6 @@ export const adminRoutes = new Hono()
 
     // Invalidate in-memory rubric cache so next evaluation uses fresh rubric
     invalidateRubricCache(id);
-
-    // If it's an in-memory question, warm up the cache with the new content
-    if (rubricRegenerated && row) {
-      warmUpRubricCache(row as unknown as Question).catch(() => {});
-    }
 
     return c.json({ ok: true, question: row, rubricRegenerated });
   })

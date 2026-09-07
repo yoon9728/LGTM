@@ -8,9 +8,9 @@ import { Separator } from "@/components/ui/separator";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { UserButton } from "@/components/user-button";
 import { useSession } from "@/lib/auth-client";
-import { api } from "@/lib/api";
-import type { QuestionListItem, CategoryMeta, CategoryStats } from "@/lib/api";
-import { GUEST_LIMIT, GUEST_STORAGE_KEY } from "@/lib/guest";
+import { api, getApiErrorMessage } from "@/lib/api";
+import type { QuestionListItem, CategoryMeta } from "@/lib/api";
+import { GUEST_LIMIT, useGuestSessionCount } from "@/lib/guest";
 import { LoadingSpinner, LoadingDots } from "@/components/loading-spinner";
 import { MobileNav } from "@/components/mobile-nav";
 import {
@@ -43,16 +43,12 @@ export default function TypeQuestionsPage({
   const [stats, setStats] = useState<{ total: number; completed: number } | null>(null);
   const [loading, setLoading] = useState(true);
   const [starting, setStarting] = useState(false);
-  const [guestCompletions, setGuestCompletions] = useState(0);
+  const guestCompletions = useGuestSessionCount();
+  const [error, setError] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<"list" | "card">("list");
   const [sortBy, setSortBy] = useState<"default" | "easy-first" | "hard-first">("default");
   const [pageSize, setPageSize] = useState(20);
   const [currentPage, setCurrentPage] = useState(1);
-
-  useEffect(() => {
-    const stored = localStorage.getItem(GUEST_STORAGE_KEY);
-    if (stored) setGuestCompletions(parseInt(stored) || 0);
-  }, []);
 
   useEffect(() => {
     window.scrollTo({ top: 0 });
@@ -94,6 +90,7 @@ export default function TypeQuestionsPage({
 
   const startSession = useCallback(async (questionId?: string) => {
     setStarting(true);
+    setError(null);
     try {
       const { session } = await api.createSession({
         questionId,
@@ -101,7 +98,8 @@ export default function TypeQuestionsPage({
         type: questionId ? undefined : type,
       });
       router.push(`/practice/session/${session.id}`);
-    } catch {
+    } catch (err) {
+      setError(getApiErrorMessage(err, "Could not start a session. Please try again."));
       setStarting(false);
     }
   }, [category, type, router]);
@@ -138,6 +136,7 @@ export default function TypeQuestionsPage({
           <Link href="/" className="text-xs font-bold tracking-[0.16em] uppercase hover:text-primary transition-colors">
             LGTM
           </Link>
+          <div className="hidden sm:contents">
           <Separator orientation="vertical" className="h-4" />
           <Link href="/practice" className="text-xs text-muted-foreground tracking-wide hover:text-foreground transition-colors">
             Practice
@@ -150,10 +149,11 @@ export default function TypeQuestionsPage({
           <span className="text-xs text-muted-foreground tracking-wide">
             {displayLabel}
           </span>
+          </div>
         </div>
         <div className="flex items-center gap-2">
           {isAuthenticated && (
-            <Link href="/history">
+            <Link href="/history" className="hidden sm:block">
               <Button size="sm" variant="ghost">
                 <HistoryIcon className="size-3.5 mr-1.5" />
                 History
@@ -165,6 +165,8 @@ export default function TypeQuestionsPage({
           <MobileNav />
         </div>
       </header>
+
+      {error && <p role="alert" className="mb-6 rounded-lg border border-destructive/20 bg-destructive/10 px-4 py-3 text-sm text-destructive">{error}</p>}
 
       {/* Guest limit */}
       {guestLimitReached && (

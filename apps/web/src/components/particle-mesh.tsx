@@ -82,13 +82,13 @@ export function ParticleMesh({ className }: { className?: string }) {
     let h = 0;
     let dpr = 1;
     let particles: Particle[] = [];
-    let mouse = { x: -9999, y: -9999, active: false };
+    const mouse = { x: -9999, y: -9999, active: false };
 
     // Drag state
     let isDragging = false;
-    let dragVel = { x: 0, y: 0 };
-    let prevDrag = { x: 0, y: 0 };
-    let fieldVel = { x: 0, y: 0 };
+    const dragVel = { x: 0, y: 0 };
+    const prevDrag = { x: 0, y: 0 };
+    const fieldVel = { x: 0, y: 0 };
 
     // Watch theme changes
     const observer = new MutationObserver(() => {

@@ -4,89 +4,93 @@ import { evaluate } from "../services/evaluation.js";
 import { optionalAuth } from "../middleware/auth.js";
 import { getRubric } from "../services/rubric-store.js";
 
+const MAX_FIELD_LEN = 50_000;
+const TEXT_FIELDS = [
+  "sessionId", "questionId", "category", "diff", "summary", "overview", "components",
+  "tradeoffs", "scalingStrategy", "rootCause", "evidence", "proposedFix", "query",
+  "explanation", "optimization", "code", "approach", "complexity", "analysis",
+  "recommendation", "reasoning", "selectedAnswer",
+] as const;
+
+type AnswerInput = Partial<Record<typeof TEXT_FIELDS[number], string>> & {
+  findings?: string[];
+  blocks?: { type: "text" | "code"; language?: string; content: string }[];
+};
+
+function validateInput(value: unknown): string[] {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return ["Request body must be a JSON object."];
+  }
+  const body = value as Record<string, unknown>;
+  const errors: string[] = [];
+  for (const name of TEXT_FIELDS) {
+    const field = body[name];
+    const limit = ["sessionId", "questionId", "category"].includes(name) ? 200 : MAX_FIELD_LEN;
+    if (field !== undefined && (typeof field !== "string" || field.length > limit)) {
+      errors.push(`${name} must be a string of at most ${limit} characters.`);
+    }
+  }
+  if (typeof body.sessionId !== "string" || !body.sessionId.trim()) {
+    errors.push("sessionId is required.");
+  }
+  if (body.findings !== undefined && (
+    !Array.isArray(body.findings) || body.findings.length > 100 ||
+    body.findings.some((finding) => typeof finding !== "string" || finding.length > MAX_FIELD_LEN)
+  )) {
+    errors.push(`findings must contain at most 100 strings of at most ${MAX_FIELD_LEN} characters.`);
+  }
+  if (body.blocks !== undefined) {
+    if (!Array.isArray(body.blocks) || body.blocks.length > 20) {
+      errors.push("blocks must be an array with at most 20 items.");
+    } else {
+      for (const block of body.blocks) {
+        if (!block || typeof block !== "object" || Array.isArray(block) ||
+            !["text", "code"].includes(block.type) ||
+            typeof block.content !== "string" || block.content.length > MAX_FIELD_LEN ||
+            (block.language !== undefined && (
+              typeof block.language !== "string" || !/^[a-zA-Z][a-zA-Z0-9_+#.-]{0,49}$/.test(block.language)
+            ))) {
+          errors.push("Each block must have a text/code type, string content, and an optional language identifier.");
+          break;
+        }
+      }
+    }
+  }
+  return errors;
+}
+
 export const answerRoutes = new Hono()
   .use("*", optionalAuth)
 
   .post("/", async (c) => {
-    const body = await c.req.json<{
-      sessionId?: string;
-      questionId?: string;
-      category?: string;
-      // code_review fields
-      diff?: string;
-      summary?: string;
-      findings?: string[];
-      // system_design fields
-      overview?: string;
-      components?: string;
-      tradeoffs?: string;
-      scalingStrategy?: string;
-      // debugging fields
-      rootCause?: string;
-      evidence?: string;
-      proposedFix?: string;
-      // data_analysis fields
-      query?: string;
-      explanation?: string;
-      optimization?: string;
-      // practical_coding fields
-      code?: string;
-      approach?: string;
-      complexity?: string;
-      // cfa fields
-      analysis?: string;
-      recommendation?: string;
-      reasoning?: string;
-      // MCQ
-      selectedAnswer?: string;
-      // block editor structured data (optional, for richer evaluation)
-      blocks?: { type: string; language?: string; content: string }[];
-    }>();
+    const input: unknown = await c.req.json().catch(() => undefined);
+    const errors = validateInput(input);
+    if (errors.length > 0) return c.json({ error: { code: "invalid_input", details: errors } }, 400);
+    const body = input as AnswerInput;
 
-    // Validation
-    const errors: string[] = [];
-    if (!body.sessionId) errors.push("sessionId is required.");
+    const session = await db.sessions.get(body.sessionId!);
+    if (!session) return c.json({ error: "Session not found" }, 404);
+    const user = c.get("user");
+    const isOwner = session.candidateId === "guest" || user?.id === session.candidateId;
+    if (!isOwner) return c.json({ error: "Forbidden" }, 403);
 
-    // Input size limits (max 50KB per text field)
-    const MAX_FIELD_LEN = 50_000;
-    const textFields = [
-      body.diff, body.summary, body.overview, body.components,
-      body.tradeoffs, body.scalingStrategy, body.rootCause, body.evidence,
-      body.proposedFix, body.query, body.explanation, body.optimization,
-      body.code, body.approach, body.complexity,
-      body.analysis, body.recommendation, body.reasoning,
-    ];
-    for (const field of textFields) {
-      if (typeof field === "string" && field.length > MAX_FIELD_LEN) {
-        errors.push(`Field exceeds maximum length of ${MAX_FIELD_LEN} characters.`);
-        break;
-      }
-    }
-
-    // Early session lookup — needed to detect MCQ questions by question.format
-    const earlySession = body.sessionId ? await db.sessions.get(body.sessionId) : undefined;
-    if (body.sessionId && !earlySession) {
-      return c.json({ error: "Session not found" }, 404);
-    }
-
-    const isMcq = earlySession?.question?.format === "mcq";
-    const cat = isMcq ? "mcq" : (body.category ?? "code_review");
+    const isMcq = session.question.format === "mcq";
+    const cat = session.question.category;
 
     // Category-specific content validation
     let content: Record<string, unknown> = {};
     if (isMcq) {
       const selected = (body.selectedAnswer ?? "").trim().toUpperCase();
-      const validLetters = ["A", "B", "C", "D", "E"];
+      const validLetters = ["A", "B", "C", "D", "E"].slice(0, session.question.choices?.length ?? 0);
       if (!selected) errors.push("selectedAnswer is required.");
-      else if (!validLetters.includes(selected)) errors.push("selectedAnswer must be A, B, C, D, or E.");
+      else if (!validLetters.includes(selected)) errors.push("selectedAnswer must match one of this question's choices.");
       content = { selectedAnswer: selected };
     } else switch (cat) {
       case "code_review": {
-        if (!body.diff?.trim()) errors.push("diff is required.");
         const summary = (body.summary ?? "").trim();
-        const findings = Array.isArray(body.findings) ? body.findings.filter(Boolean) : [];
+        const findings = (body.findings ?? []).map((finding) => finding.trim()).filter(Boolean);
         if (!summary && findings.length === 0) errors.push("Either summary or findings is required.");
-        content = { summary, findings, diff: body.diff ?? "" };
+        content = { summary, findings, diff: session.question.diff };
         break;
       }
       case "system_design": {
@@ -134,42 +138,28 @@ export const answerRoutes = new Hono()
         break;
       }
       default: {
-        const summary = (body.summary ?? "").trim();
-        const findings = Array.isArray(body.findings) ? body.findings.filter(Boolean) : [];
-        if (!summary && findings.length === 0) errors.push("Either summary or findings is required.");
-        content = { summary, findings, diff: body.diff ?? "" };
-      }
-    }
-
-    // Validate blocks array size
-    if (body.blocks) {
-      if (body.blocks.length > 20) errors.push("Too many blocks (max 20).");
-      for (const block of body.blocks) {
-        if (typeof block.content === "string" && block.content.length > MAX_FIELD_LEN) {
-          errors.push("Block content exceeds maximum length.");
-          break;
-        }
+        return c.json({ error: "Unsupported question category" }, 422);
       }
     }
 
     if (errors.length > 0) return c.json({ error: { code: "invalid_input", details: errors } }, 400);
 
-    // Session was looked up earlier; ensure still present
-    const session = earlySession;
-    if (!session) return c.json({ error: "Session not found" }, 404);
-
-    // Ownership check — only session owner or guest sessions allowed
-    const user = c.get("user");
-    const isOwner = session.candidateId === "guest" || user?.id === session.candidateId;
-    if (!isOwner) return c.json({ error: "Forbidden" }, 403);
-
-    // Duplicate guard
+    // Best-effort duplicate guard; cross-request safety requires a unique session_id constraint.
     if (await db.answers.findBySessionId(session.id)) {
       return c.json({ error: "An answer for this session already exists." }, 409);
     }
 
     // Always derive questionId from session — never trust client value
     const questionId = session.question.id;
+
+    // Prepare grading before saving so a rubric failure cannot strand an ungraded answer behind a 409.
+    // The session lookup already includes the canonical question. MCQ needs no generated rubric.
+    let question = session.question;
+    if (session.language) question = { ...question, language: session.language };
+    if (!isMcq) {
+      const rubric = await getRubric(question);
+      question = { ...question, rubric };
+    }
 
     const answer = await db.answers.insert({
       id: crypto.randomUUID(),
@@ -180,21 +170,7 @@ export const answerRoutes = new Hono()
       createdAt: new Date().toISOString(),
     });
 
-    if (body.sessionId) await db.sessions.updateStatus(body.sessionId, "answer_submitted");
-
-    // Get question and resolve rubric (cached AI-generated, or generates on first use).
-    // MCQ: skip both DB lookup and rubric resolution — exact-match eval doesn't need them,
-    // and getRubric would otherwise call OpenAI every time since MCQ has an empty mustCover.
-    let question = isMcq ? session.question : await db.questions.getById(answer.questionId);
-    if (question && !isMcq) {
-      const rubric = await getRubric(question);
-      question = { ...question, rubric };
-    }
-
-    // Use session-level language (user's choice) over question-level language
-    if (session?.language && question) {
-      question = { ...question, language: session.language };
-    }
+    await db.sessions.updateStatus(session.id, "answer_submitted");
 
     const evaluation = await evaluate(answer, question);
     return c.json({ ok: true, answer, evaluation }, 201);

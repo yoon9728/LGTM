@@ -3,7 +3,7 @@ FROM node:22-alpine
 WORKDIR /app
 
 COPY package.json package-lock.json* ./
-RUN npm install --omit=dev && npm install tsx
+RUN npm ci --omit=dev
 
 COPY . .
 
@@ -11,4 +11,5 @@ EXPOSE 4300
 ENV NODE_ENV=production
 ENV PORT=4300
 
-CMD ["npx", "tsx", "src/index.ts"]
+USER node
+CMD ["./node_modules/.bin/tsx", "src/index.ts"]

@@ -4,7 +4,9 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "npm run dev:api & npm run dev:web",
+    "dev": "node tools/dev.mjs",
+    "test": "npm --prefix apps/api test && npm --prefix apps/web test",
+    "check": "npm --prefix apps/api run typecheck && npm --prefix apps/web run lint && npm --prefix apps/web run build",
     "dev:web": "cd apps/web && npx next dev --port 4173",
     "dev:api": "cd apps/api && npx tsx watch src/index.ts",
     "screenshots": "npx tsx scripts/take-screenshots.ts"

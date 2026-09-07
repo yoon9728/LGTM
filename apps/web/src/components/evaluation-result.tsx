@@ -21,6 +21,8 @@ import { cn } from "@/lib/utils";
 interface EvaluationResultProps {
   evaluation: Evaluation;
   isGuest?: boolean;
+  onRetry?: () => void;
+  retrying?: boolean;
 }
 
 function scoreBand(score: number) {
@@ -31,7 +33,6 @@ function scoreBand(score: number) {
 
 function scoreLabel(score: number, band: string) {
   if (score === 100) return "LGTM";
-  if (score === 0) return "Not scored";
   if (band === "high") return "Strong";
   if (band === "mid") return "Developing";
   return "Needs work";
@@ -73,7 +74,7 @@ function GuestUpgradeBanner() {
   );
 }
 
-export function EvaluationResult({ evaluation, isGuest = false }: EvaluationResultProps) {
+export function EvaluationResult({ evaluation, isGuest = false, onRetry, retrying = false }: EvaluationResultProps) {
   const score = evaluation.score ?? 0;
   const band = scoreBand(score);
   const [criteriaOpen, setCriteriaOpen] = useState(false);
@@ -82,6 +83,25 @@ export function EvaluationResult({ evaluation, isGuest = false }: EvaluationResu
     (cr) => cr.coverage === "covered"
   ).length ?? 0;
   const totalCriteria = evaluation.criteriaResults?.length ?? 0;
+
+  if (!evaluation.evaluable || evaluation.score == null) {
+    const retryable = ["evaluation_timeout", "provider_failure", "provider_not_configured"].includes(evaluation.reason ?? "");
+    return (
+      <div role="status" className="rounded-lg border border-border p-5 space-y-3">
+        <h3 className="text-lg font-semibold">Not evaluated</h3>
+        <p className="text-sm text-muted-foreground">
+          {retryable
+            ? "Your answer is saved, but the evaluation service could not finish. This is not a score of zero."
+            : evaluation.rationale ?? "This answer could not be evaluated."}
+        </p>
+        {retryable && onRetry && (
+          <Button type="button" onClick={onRetry} disabled={retrying}>
+            {retrying ? "Retrying evaluation..." : "Retry evaluation"}
+          </Button>
+        )}
+      </div>
+    );
+  }
 
   // MCQ: render a minimal Correct/Incorrect verdict + explanation instead of full rubric UI.
   if (evaluation.provider === "mcq-exact-match") {

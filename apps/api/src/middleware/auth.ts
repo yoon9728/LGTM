@@ -5,6 +5,7 @@ export interface AuthUser {
   id: string;
   name: string;
   email: string;
+  emailVerified?: boolean;
 }
 
 /**
@@ -22,7 +23,7 @@ export async function optionalAuth(c: Context, next: Next) {
       c.set("user", null);
     }
   } catch {
-    c.set("user", null);
+    return c.json({ error: "Authentication service is temporarily unavailable" }, 503);
   }
   await next();
 }
@@ -40,7 +41,7 @@ export async function requireAuth(c: Context, next: Next) {
     }
     c.set("user", session.user as AuthUser);
   } catch {
-    return c.json({ error: "Authentication required" }, 401);
+    return c.json({ error: "Authentication service is temporarily unavailable" }, 503);
   }
   await next();
 }

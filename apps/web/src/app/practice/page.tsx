@@ -10,7 +10,7 @@ import { useSession } from "@/lib/auth-client";
 import { api } from "@/lib/api";
 import type { CategoryMeta, CategoryStats } from "@/lib/api";
 import { useScrollReveal } from "@/hooks/useScrollReveal";
-import { GUEST_LIMIT, GUEST_STORAGE_KEY } from "@/lib/guest";
+import { GUEST_LIMIT, useGuestSessionCount } from "@/lib/guest";
 import { LoadingSpinner } from "@/components/loading-spinner";
 import { MobileNav } from "@/components/mobile-nav";
 import {
@@ -49,13 +49,8 @@ export default function PracticeTypesPage() {
 
   const [categories, setCategories] = useState<CategoryMeta[]>([]);
   const [categoryStats, setCategoryStats] = useState<Record<string, CategoryStats>>({});
-  const [guestCompletions, setGuestCompletions] = useState(0);
+  const guestCompletions = useGuestSessionCount();
   const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    const stored = localStorage.getItem(GUEST_STORAGE_KEY);
-    if (stored) setGuestCompletions(parseInt(stored) || 0);
-  }, []);
 
   useEffect(() => {
     Promise.all([
@@ -126,7 +121,7 @@ export default function PracticeTypesPage() {
             </div>
             <h2 className="text-xl font-semibold tracking-tight">Guest limit reached</h2>
             <p className="text-sm text-muted-foreground leading-relaxed">
-              You&apos;ve completed {GUEST_LIMIT} free sessions. Create an account to unlock all questions and track your progress.
+              You&apos;ve used {GUEST_LIMIT} guest sessions today. Create an account to continue, or return after your daily limit resets.
             </p>
             <div className="flex gap-3 justify-center pt-2">
               <Link href="/sign-up">

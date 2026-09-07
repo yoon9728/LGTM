@@ -1,0 +1,8 @@
+node_modules
+.env*
+tools
+src/**/*.test.ts
+src/db/seed.ts
+src/db/import-questions.ts
+src/db/migrate-questions.ts
+src/db/update-templates.ts

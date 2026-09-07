@@ -14,9 +14,9 @@ import { BlockEditor, type Block } from "@/components/block-editor";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { UserButton } from "@/components/user-button";
 import { useSession } from "@/lib/auth-client";
-import { api } from "@/lib/api";
-import type { Session, Evaluation } from "@/lib/api";
-import { GUEST_LIMIT, GUEST_STORAGE_KEY } from "@/lib/guest";
+import { api, getApiErrorMessage } from "@/lib/api";
+import type { Session, Evaluation, Answer, AnswerReview } from "@/lib/api";
+import { GUEST_LIMIT, useGuestSessionCount } from "@/lib/guest";
 import { LoadingSpinner } from "@/components/loading-spinner";
 import { MobileNav } from "@/components/mobile-nav";
 import {
@@ -47,8 +47,19 @@ const CATEGORY_COLORS: Record<string, string> = {
 
 type Step = "loading" | "diff" | "analysis" | "result";
 
+function restoreBlocks(review: AnswerReview, fallback: string, language: string): Block[] {
+  if (review.blocks?.length) {
+    return review.blocks.map((block) => ({ ...block, id: crypto.randomUUID() }));
+  }
+  return [{ id: crypto.randomUUID(), type: "text", language, content: fallback }];
+}
+
 export default function SessionPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
+  return <SessionContent key={id} id={id} />;
+}
+
+function SessionContent({ id }: { id: string }) {
   const router = useRouter();
   const { data: authSession } = useSession();
   const isAuthenticated = !!authSession?.user;
@@ -94,18 +105,46 @@ export default function SessionPage({ params }: { params: Promise<{ id: string }
     { id: crypto.randomUUID(), type: "code", language: "javascript", content: "" },
   ]);
   const [evaluation, setEvaluation] = useState<Evaluation | null>(null);
+  const [savedAnswer, setSavedAnswer] = useState<Answer | null>(null);
+  const [resultLoadFailed, setResultLoadFailed] = useState(false);
   const [showSignupPrompt, setShowSignupPrompt] = useState(false);
 
-  const [guestCompletions, setGuestCompletions] = useState(0);
+  const guestCompletions = useGuestSessionCount();
 
   // Session timer
   const [elapsed, setElapsed] = useState(0);
 
   const rightPanelRef = useRef<HTMLDivElement>(null);
+  const submittingRef = useRef(false);
+  const activeRef = useRef(true);
 
   useEffect(() => {
-    const stored = localStorage.getItem(GUEST_STORAGE_KEY);
-    if (stored) setGuestCompletions(parseInt(stored) || 0);
+    activeRef.current = true;
+    return () => { activeRef.current = false; };
+  }, []);
+
+  const restoreAnswer = useCallback((answer: Answer) => {
+    const review = answer.review;
+    setSavedAnswer(answer);
+    setSummary(review.summary ?? "");
+    setFindings((review.findings ?? []).join("\n"));
+    setOverview(review.overview ?? "");
+    setComponents(review.components ?? "");
+    setTradeoffs(review.tradeoffs ?? "");
+    setScalingStrategy(review.scalingStrategy ?? "");
+    setRootCause(review.rootCause ?? "");
+    setEvidence(review.evidence ?? "");
+    setExplanation(review.explanation ?? "");
+    setOptimization(review.optimization ?? "");
+    setAnalysis(review.analysis ?? "");
+    setRecommendation(review.recommendation ?? "");
+    setReasoning(review.reasoning ?? "");
+    setSelectedAnswer(review.selectedAnswer ?? "");
+    setApproach(review.approach ?? "");
+    setComplexity(review.complexity ?? "");
+    setCodeBlocks(restoreBlocks(review, review.code ?? "", "javascript"));
+    setQueryBlocks(restoreBlocks(review, review.query ?? "", "sql"));
+    setFixBlocks(restoreBlocks(review, review.proposedFix ?? "", "javascript"));
   }, []);
 
   // Timer runs only during answer writing
@@ -118,7 +157,9 @@ export default function SessionPage({ params }: { params: Promise<{ id: string }
 
   // Load session
   useEffect(() => {
+    let cancelled = false;
     api.getSession(id).then(async (res) => {
+      if (cancelled) return;
       setSession(res.session);
       const lang = res.session.language ?? res.session.question.language ?? null;
       setSelectedLanguage(lang);
@@ -135,20 +176,28 @@ export default function SessionPage({ params }: { params: Promise<{ id: string }
       // If session already answered, jump to result
       if (res.session.status === "answer_submitted") {
         try {
-          const retry = await api.retryEvaluation(res.session.id);
-          setEvaluation(retry.evaluation);
+          const result = await api.getSessionResult(res.session.id);
+          if (cancelled) return;
+          if (result.answer) restoreAnswer(result.answer);
+          else setError("No saved answer is available for this session. Please return to questions.");
+          setEvaluation(result.evaluation);
           setStep("result");
-        } catch {
-          setStep("diff"); // fallback: show problem
+        } catch (err) {
+          if (cancelled) return;
+          setResultLoadFailed(true);
+          setError(getApiErrorMessage(err, "Could not load your saved answer and evaluation. Please reload the result below."));
+          setStep("result");
         }
       } else {
         setStep("diff");
       }
-    }).catch(() => {
-      setError("Session not found");
+    }).catch((err) => {
+      if (cancelled) return;
+      setError(getApiErrorMessage(err, "Could not load this session. Please return to questions and try again."));
       setStep("diff");
     });
-  }, [id]);
+    return () => { cancelled = true; };
+  }, [id, restoreAnswer]);
 
   // Scroll right panel into view when entering analysis
   useEffect(() => {
@@ -236,62 +285,116 @@ export default function SessionPage({ params }: { params: Promise<{ id: string }
       case "data_analysis": return !!(hasBlockContent(queryBlocks) || explanation.trim());
       case "practical_coding": return hasBlockContent(codeBlocks);
       case "cfa": return !!analysis.trim();
-      default: return !!summary.trim();
+      default: return !!(summary.trim() || findings.trim());
     }
-  }, [session, summary, overview, components, rootCause, queryBlocks, explanation, codeBlocks, analysis, selectedAnswer, hasBlockContent]);
+  }, [session, summary, findings, overview, components, rootCause, queryBlocks, explanation, codeBlocks, analysis, selectedAnswer, hasBlockContent]);
 
   const submitAnswer = useCallback(
     async (e: React.FormEvent) => {
       e.preventDefault();
-      if (!isFormValid()) return;
+      if (submittingRef.current || !isFormValid()) return;
       const payload = buildAnswerPayload();
       if (!payload) return;
+      submittingRef.current = true;
       setLoading(true);
       setError(null);
       try {
         const res = await api.submitAnswer(payload);
+        if (!activeRef.current) return;
+        restoreAnswer(res.answer);
         setEvaluation(res.evaluation);
         setStep("result");
 
         if (!isAuthenticated) {
-          const newCount = guestCompletions + 1;
-          setGuestCompletions(newCount);
-          localStorage.setItem(GUEST_STORAGE_KEY, String(newCount));
           setShowSignupPrompt(true);
         }
       } catch (err) {
+        if (!activeRef.current) return;
         const status = (err as { status?: number }).status;
         if (status === 409 && session) {
           // Answer already exists — fetch the existing evaluation
           try {
-            const retry = await api.retryEvaluation(session.id);
-            setEvaluation(retry.evaluation);
+            const result = await api.getSessionResult(session.id);
+            if (!activeRef.current) return;
+            if (result.answer) restoreAnswer(result.answer);
+            else setError("No saved answer is available for this session. Please return to questions.");
+            setEvaluation(result.evaluation);
             setStep("result");
-          } catch {
-            setError("Answer already submitted for this session.");
+          } catch (retryError) {
+            if (!activeRef.current) return;
+            setResultLoadFailed(true);
+            setError(getApiErrorMessage(retryError, "Could not load your saved answer and evaluation. Please reload the result below."));
+            setStep("result");
           }
         } else {
           if (process.env.NODE_ENV === "development") console.error("Submit answer failed:", err);
-          setError("Failed to submit answer. Please try again.");
+          setError(getApiErrorMessage(err, "Failed to submit answer. Please try again."));
         }
       } finally {
-        setLoading(false);
+        submittingRef.current = false;
+        if (activeRef.current) setLoading(false);
       }
     },
-    [buildAnswerPayload, isFormValid, isAuthenticated, guestCompletions, session]
+    [buildAnswerPayload, isFormValid, isAuthenticated, session, restoreAnswer]
   );
+
+  const reloadSavedResult = useCallback(async () => {
+    if (!session || submittingRef.current) return;
+    submittingRef.current = true;
+    setLoading(true);
+    setError(null);
+    try {
+      const result = await api.getSessionResult(session.id);
+      if (!activeRef.current) return;
+      if (result.answer) restoreAnswer(result.answer);
+      else setError("No saved answer is available for this session. Please return to questions.");
+      setEvaluation(result.evaluation);
+      setResultLoadFailed(false);
+    } catch (err) {
+      if (!activeRef.current) return;
+      setError(getApiErrorMessage(err, "Could not load your saved result. Please try again."));
+    } finally {
+      submittingRef.current = false;
+      if (activeRef.current) setLoading(false);
+    }
+  }, [session, restoreAnswer]);
+
+  const retrySavedEvaluation = useCallback(async () => {
+    if (!session || !savedAnswer || submittingRef.current) return;
+    submittingRef.current = true;
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await api.retryEvaluation(session.id);
+      if (!activeRef.current) return;
+      restoreAnswer(res.answer);
+      setEvaluation(res.evaluation);
+      setStep("result");
+    } catch (err) {
+      if (!activeRef.current) return;
+      setError(getApiErrorMessage(err, "Could not retry the evaluation. Your answer is saved; please try again."));
+    } finally {
+      submittingRef.current = false;
+      if (activeRef.current) setLoading(false);
+    }
+  }, [session, savedAnswer, restoreAnswer]);
 
   const startNewRandom = useCallback(async () => {
     if (!session) return;
     setLoading(true);
+    setError(null);
     try {
       const { session: newSession } = await api.createSession({
         category: session.question.category,
         type: session.question.type,
-        language: session.language ?? undefined,
+        // Coding questions are language-neutral; the session choice is not a question filter.
+        language: session.question.category === "practical_coding" ? undefined : session.language ?? undefined,
       });
+      if (!activeRef.current) return;
       router.push(`/practice/session/${newSession.id}`);
-    } catch {
+    } catch (err) {
+      if (!activeRef.current) return;
+      setError(getApiErrorMessage(err, "Could not start another question. Please try again."));
       setLoading(false);
     }
   }, [session, router]);
@@ -327,12 +430,13 @@ export default function SessionPage({ params }: { params: Promise<{ id: string }
     if (category === "practical_coding" && selectedLanguage && session) {
       try {
         await api.updateSession(session.id, { language: selectedLanguage });
+        if (!activeRef.current) return;
         setSession({ ...session, language: selectedLanguage });
       } catch {
         // Non-blocking — evaluation will still use selectedLanguage from blocks
       }
     }
-    setStep("analysis");
+    if (activeRef.current) setStep("analysis");
   };
 
   // -- Shared sub-components --
@@ -426,7 +530,7 @@ export default function SessionPage({ params }: { params: Promise<{ id: string }
     </div>
   );
 
-  const analysisPanel = session && (
+  const analysisPanel = session && (step !== "result" || savedAnswer) && (
     <div className="space-y-4" ref={rightPanelRef}>
       <div className="space-y-1">
         <p className="text-xs font-semibold tracking-wide uppercase text-muted-foreground">
@@ -443,6 +547,7 @@ export default function SessionPage({ params }: { params: Promise<{ id: string }
         </p>
       </div>
       <form onSubmit={submitAnswer} className="space-y-4">
+        <fieldset disabled={loading} className="min-w-0 space-y-4">
 
         {/* MCQ Form */}
         {isMcq && session.question.choices && (
@@ -463,7 +568,7 @@ export default function SessionPage({ params }: { params: Promise<{ id: string }
                 <button
                   key={letter}
                   type="button"
-                  disabled={isResult}
+                  disabled={isResult || loading}
                   onClick={() => setSelectedAnswer(letter)}
                   className={`w-full text-left rounded-lg border px-4 py-3 transition-colors ${
                     isCorrect
@@ -610,6 +715,7 @@ export default function SessionPage({ params }: { params: Promise<{ id: string }
                   blocks={fixBlocks}
                   onChange={setFixBlocks}
                   defaultLanguage={sessionLanguage ?? "javascript"}
+                  disabled={loading}
                 />
               )}
             </div>
@@ -632,6 +738,7 @@ export default function SessionPage({ params }: { params: Promise<{ id: string }
                   blocks={queryBlocks}
                   onChange={setQueryBlocks}
                   defaultLanguage="sql"
+                  disabled={loading}
                 />
               )}
             </div>
@@ -675,7 +782,7 @@ export default function SessionPage({ params }: { params: Promise<{ id: string }
           <>
             <div className="space-y-2">
               <label htmlFor="analysis" className="text-sm font-medium text-foreground">
-                Analysis <span className="text-muted-foreground font-normal">— what's happening, what standard or concept applies, what the key issue is</span>
+                Analysis <span className="text-muted-foreground font-normal">— what&apos;s happening, what standard or concept applies, what the key issue is</span>
               </label>
               {step === "result" ? (
                 <p className="text-sm text-foreground/80 whitespace-pre-wrap bg-muted/30 rounded-lg px-4 py-3">{analysis || "—"}</p>
@@ -745,6 +852,7 @@ export default function SessionPage({ params }: { params: Promise<{ id: string }
                   onChange={setCodeBlocks}
                   defaultLanguage={sessionLanguage ?? "javascript"}
                   templates={session?.question.templates}
+                  disabled={loading}
                 />
               )}
             </div>
@@ -802,19 +910,35 @@ export default function SessionPage({ params }: { params: Promise<{ id: string }
             </p>
           </div>
         )}
+        </fieldset>
       </form>
     </div>
   );
 
-  const resultPanel = step === "result" && evaluation && (
+  const resultPanel = step === "result" && (
     <div className="space-y-4">
       <div className="space-y-1">
         <p className="text-xs font-semibold tracking-wide uppercase text-muted-foreground">
           03 · Evaluation
         </p>
-        <p className="text-sm text-muted-foreground">AI-graded against expert criteria.</p>
+        <p className="text-sm text-muted-foreground">{isMcq ? "Answer feedback and explanation." : "AI-graded against expert criteria."}</p>
       </div>
-      <EvaluationResult evaluation={evaluation} isGuest={!isAuthenticated} />
+      {evaluation ? (
+        <EvaluationResult evaluation={evaluation} isGuest={!isAuthenticated} onRetry={savedAnswer ? retrySavedEvaluation : undefined} retrying={loading} />
+      ) : (
+        <div className="rounded-lg border border-border p-5 space-y-3">
+          <p className="text-sm text-muted-foreground">
+            {resultLoadFailed ? "The saved result could not be loaded. Reloading does not run a new evaluation."
+              : savedAnswer ? "Your answer is saved, but no evaluation is available yet."
+                : "No saved answer is available for this session."}
+          </p>
+          {(resultLoadFailed || savedAnswer) && (
+            <Button type="button" onClick={resultLoadFailed ? reloadSavedResult : retrySavedEvaluation} disabled={loading}>
+              {loading ? "Loading result..." : resultLoadFailed ? "Reload saved result" : "Retry evaluation"}
+            </Button>
+          )}
+        </div>
+      )}
 
       {/* Signup prompt for guests */}
       {showSignupPrompt && !isAuthenticated && (
@@ -881,6 +1005,7 @@ export default function SessionPage({ params }: { params: Promise<{ id: string }
           <Link href="/" className="text-xs font-bold tracking-[0.16em] uppercase hover:text-primary transition-colors">
             LGTM
           </Link>
+          <div className="hidden sm:contents">
           <Separator orientation="vertical" className="h-4" />
           <Link href="/practice" className="text-xs text-muted-foreground tracking-wide hover:text-foreground transition-colors">
             Practice
@@ -893,6 +1018,7 @@ export default function SessionPage({ params }: { params: Promise<{ id: string }
               </Link>
             </>
           )}
+          </div>
         </div>
         <div className="flex items-center gap-2">
           <ThemeToggle />

@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import dynamic from "next/dynamic";
 import { useSession } from "@/lib/auth-client";
-import { api, type UserStats } from "@/lib/api";
+import { api, getApiErrorMessage, type UserStats } from "@/lib/api";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/theme-toggle";
@@ -81,17 +81,18 @@ export default function DashboardPage() {
   const { data: session, isPending } = useSession();
   const [stats, setStats] = useState<UserStats | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   const fetchStats = useCallback(async () => {
     try {
       const { stats } = await api.getStats();
       setStats(stats);
-    } catch {
-      router.push("/sign-in");
+    } catch (err) {
+      setError(getApiErrorMessage(err, "Could not load your dashboard. Please try again."));
     } finally {
       setLoading(false);
     }
-  }, [router]);
+  }, []);
 
   useEffect(() => {
     if (isPending) return;
@@ -109,6 +110,13 @@ export default function DashboardPage() {
       </div>
     );
   }
+
+  if (error) return (
+    <div role="alert" className="max-w-4xl mx-auto px-6 py-24 text-center space-y-4">
+      <p className="text-sm text-muted-foreground">{error}</p>
+      <Button variant="outline" onClick={() => { setError(null); setLoading(true); fetchStats(); }}>Retry</Button>
+    </div>
+  );
 
   if (!stats) return null;
 

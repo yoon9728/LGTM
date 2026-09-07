@@ -290,11 +290,17 @@ export const db = {
         })
         .where(eq(sessionsTable.id, id));
     },
-    async updateLanguage(id: string, language: string): Promise<void> {
-      await getPgDb()
+    async updateLanguage(id: string, language: string): Promise<boolean> {
+      const rows = await getPgDb()
         .update(sessionsTable)
         .set({ language })
-        .where(eq(sessionsTable.id, id));
+        .where(and(
+          eq(sessionsTable.id, id),
+          eq(sessionsTable.status, "question_ready"),
+          sql`NOT EXISTS (SELECT 1 FROM ${answersTable} WHERE ${answersTable.sessionId} = ${sessionsTable.id})`,
+        ))
+        .returning({ id: sessionsTable.id });
+      return rows.length > 0;
     },
   },
 
@@ -331,7 +337,9 @@ export const db = {
       const [row] = await getPgDb()
         .select()
         .from(answersTable)
-        .where(eq(answersTable.sessionId, sessionId));
+        .where(eq(answersTable.sessionId, sessionId))
+        .orderBy(desc(answersTable.createdAt), desc(answersTable.id))
+        .limit(1);
       return row ? toAnswer(row) : undefined;
     },
   },
@@ -377,7 +385,9 @@ export const db = {
       const [row] = await getPgDb()
         .select()
         .from(evaluationsTable)
-        .where(eq(evaluationsTable.answerId, answerId));
+        .where(eq(evaluationsTable.answerId, answerId))
+        .orderBy(desc(evaluationsTable.createdAt), desc(evaluationsTable.id))
+        .limit(1);
       return row ? toEvaluation(row) : undefined;
     },
     /** Get best score per question for a user */

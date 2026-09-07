@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import dynamic from "next/dynamic";
 import { useSession } from "@/lib/auth-client";
-import { api, type CategoryDetail } from "@/lib/api";
+import { api, getApiErrorMessage, type CategoryDetail } from "@/lib/api";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
@@ -98,6 +98,8 @@ export default function CategoryDetailPage({ params }: { params: Promise<{ categ
   const { data: session, isPending } = useSession();
   const [data, setData] = useState<CategoryDetail | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [retry, setRetry] = useState(0);
 
   useEffect(() => {
     if (isPending) return;
@@ -105,11 +107,13 @@ export default function CategoryDetailPage({ params }: { params: Promise<{ categ
       router.push("/sign-in");
       return;
     }
+    let cancelled = false;
     api.getCategoryStats(category)
-      .then((res) => setData(res))
-      .catch(() => router.push("/dashboard"))
-      .finally(() => setLoading(false));
-  }, [session, isPending, category, router]);
+      .then((res) => { if (!cancelled) setData(res); })
+      .catch((err) => { if (!cancelled) setError(getApiErrorMessage(err, "Could not load this category. Please try again.")); })
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
+  }, [session, isPending, category, router, retry]);
 
   if (isPending || loading) {
     return (
@@ -118,6 +122,14 @@ export default function CategoryDetailPage({ params }: { params: Promise<{ categ
       </div>
     );
   }
+
+  if (error) return (
+    <div role="alert" className="max-w-4xl mx-auto px-6 py-24 text-center space-y-4">
+      <p className="text-sm text-muted-foreground">{error}</p>
+      <Button variant="outline" onClick={() => { setError(null); setLoading(true); setRetry((value) => value + 1); }}>Retry</Button>
+      <Link href="/dashboard" className="block text-sm text-primary">Back to dashboard</Link>
+    </div>
+  );
 
   if (!data) return null;
 
@@ -141,12 +153,14 @@ export default function CategoryDetailPage({ params }: { params: Promise<{ categ
             <Link href="/">
               <span className="text-sm font-bold tracking-[0.12em] font-mono">LGTM</span>
             </Link>
+            <div className="hidden sm:contents">
             <span className="text-muted-foreground/40">/</span>
             <Link href="/dashboard" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
               Dashboard
             </Link>
             <span className="text-muted-foreground/40">/</span>
             <span className="text-sm font-medium text-muted-foreground">{label}</span>
+            </div>
           </div>
           <div className="flex items-center gap-2">
             <ThemeToggle />
@@ -244,7 +258,6 @@ export default function CategoryDetailPage({ params }: { params: Promise<{ categ
             {subtopicStats.length > 0 ? (
               <div className="space-y-4">
                 {subtopicStats.map((st) => {
-                  const solvedCount = st.bestScore != null && st.bestScore >= 90 ? 1 : 0;
                   return (
                     <div key={st.type} className="space-y-1.5">
                       <div className="flex items-center justify-between">

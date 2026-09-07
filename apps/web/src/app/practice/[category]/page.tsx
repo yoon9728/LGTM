@@ -8,10 +8,10 @@ import { Separator } from "@/components/ui/separator";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { UserButton } from "@/components/user-button";
 import { useSession } from "@/lib/auth-client";
-import { api } from "@/lib/api";
+import { api, getApiErrorMessage } from "@/lib/api";
 import type { CategoryMeta, CategoryStats } from "@/lib/api";
 import { useScrollReveal } from "@/hooks/useScrollReveal";
-import { GUEST_LIMIT, GUEST_STORAGE_KEY } from "@/lib/guest";
+import { GUEST_LIMIT, useGuestSessionCount } from "@/lib/guest";
 import { LoadingSpinner, LoadingDots } from "@/components/loading-spinner";
 import { MobileNav } from "@/components/mobile-nav";
 import {
@@ -32,12 +32,8 @@ export default function CategoryPage({ params }: { params: Promise<{ category: s
   const [stats, setStats] = useState<CategoryStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [starting, setStarting] = useState(false);
-  const [guestCompletions, setGuestCompletions] = useState(0);
-
-  useEffect(() => {
-    const stored = localStorage.getItem(GUEST_STORAGE_KEY);
-    if (stored) setGuestCompletions(parseInt(stored) || 0);
-  }, []);
+  const guestCompletions = useGuestSessionCount();
+  const [error, setError] = useState<string | null>(null);
 
   const guestLimitReached = !isAuthenticated && !isPending && guestCompletions >= GUEST_LIMIT;
 
@@ -61,10 +57,12 @@ export default function CategoryPage({ params }: { params: Promise<{ category: s
 
   const startRandom = useCallback(async () => {
     setStarting(true);
+    setError(null);
     try {
       const { session } = await api.createSession({ category });
       router.push(`/practice/session/${session.id}`);
-    } catch {
+    } catch (err) {
+      setError(getApiErrorMessage(err, "Could not start a session. Please try again."));
       setStarting(false);
     }
   }, [category, router]);
@@ -98,16 +96,18 @@ export default function CategoryPage({ params }: { params: Promise<{ category: s
           <Link href="/" className="text-xs font-bold tracking-[0.16em] uppercase hover:text-primary transition-colors">
             LGTM
           </Link>
+          <div className="hidden sm:contents">
           <Separator orientation="vertical" className="h-4" />
           <Link href="/practice" className="text-xs text-muted-foreground tracking-wide hover:text-foreground transition-colors">
             Practice
           </Link>
           <Separator orientation="vertical" className="h-4" />
           <span className="text-xs text-muted-foreground tracking-wide">{meta.label}</span>
+          </div>
         </div>
         <div className="flex items-center gap-2">
           {isAuthenticated && (
-            <Link href="/history">
+            <Link href="/history" className="hidden sm:block">
               <Button size="sm" variant="ghost">
                 <HistoryIcon className="size-3.5 mr-1.5" />
                 History
@@ -119,6 +119,8 @@ export default function CategoryPage({ params }: { params: Promise<{ category: s
           <MobileNav />
         </div>
       </header>
+
+      {error && <p role="alert" className="mb-6 rounded-lg border border-destructive/20 bg-destructive/10 px-4 py-3 text-sm text-destructive">{error}</p>}
 
       {/* Guest limit */}
       {guestLimitReached && (

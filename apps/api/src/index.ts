@@ -42,7 +42,7 @@ const allowedOrigins = (process.env.WEB_ORIGIN ?? "http://localhost:4173")
 
 app.use("*", cors({
   origin: allowedOrigins,
-  allowMethods: ["GET", "POST", "PATCH", "OPTIONS"],
+  allowMethods: ["GET", "POST", "PATCH", "PUT", "DELETE", "OPTIONS"],
   allowHeaders: ["Content-Type"],
   credentials: true,
 }));

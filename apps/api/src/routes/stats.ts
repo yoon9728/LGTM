@@ -1,13 +1,12 @@
 import { Hono } from "hono";
-import { eq, and, sql, desc } from "drizzle-orm";
+import { eq, and, sql, desc, isNotNull } from "drizzle-orm";
 import { getPgDb } from "../db/index.js";
 import {
   sessions as sessionsTable,
-  answers as answersTable,
-  evaluations as evaluationsTable,
   questions as questionsTable,
 } from "../db/schema.js";
 import { requireAuth, type AuthUser } from "../middleware/auth.js";
+import { sessionEvaluationQueries } from "./session-evaluation.js";
 
 export const statsRoutes = new Hono()
   .use("*", requireAuth)
@@ -15,22 +14,20 @@ export const statsRoutes = new Hono()
   .get("/", async (c) => {
     const user = c.get("user") as AuthUser;
     const db = getPgDb();
+    const { latest, best, latestScore, bestScore } = sessionEvaluationQueries(db, user.id);
 
     // 1. Category-level stats: avg score, session count per category
     const categoryStats = await db
       .select({
         category: questionsTable.category,
-        sessionCount: sql<number>`COUNT(DISTINCT ${sessionsTable.id})`.as("session_count"),
-        avgScore: sql<number>`ROUND(AVG(${evaluationsTable.score}))`.as("avg_score"),
-        bestScore: sql<number>`MAX(${evaluationsTable.score})`.as("best_score"),
+        sessionCount: sql<number>`COUNT(${sessionsTable.id})`.mapWith(Number).as("session_count"),
+        avgScore: sql<number | null>`ROUND(AVG(${latestScore}))`.mapWith(Number).as("avg_score"),
+        bestScore: sql<number | null>`MAX(${bestScore})`.mapWith(Number).as("best_score"),
       })
       .from(sessionsTable)
       .innerJoin(questionsTable, eq(sessionsTable.questionId, questionsTable.id))
-      .leftJoin(answersTable, eq(answersTable.sessionId, sessionsTable.id))
-      .leftJoin(evaluationsTable, and(
-        eq(evaluationsTable.answerId, answersTable.id),
-        eq(evaluationsTable.status, "completed"),
-      ))
+      .leftJoin(latest, eq(latest.sessionId, sessionsTable.id))
+      .leftJoin(best, eq(best.sessionId, sessionsTable.id))
       .where(eq(sessionsTable.userId, user.id))
       .groupBy(questionsTable.category);
 
@@ -39,18 +36,14 @@ export const statsRoutes = new Hono()
       .select({
         sessionId: sessionsTable.id,
         category: questionsTable.category,
-        score: evaluationsTable.score,
+        score: latestScore,
         createdAt: sessionsTable.createdAt,
       })
       .from(sessionsTable)
       .innerJoin(questionsTable, eq(sessionsTable.questionId, questionsTable.id))
-      .innerJoin(answersTable, eq(answersTable.sessionId, sessionsTable.id))
-      .innerJoin(evaluationsTable, and(
-        eq(evaluationsTable.answerId, answersTable.id),
-        eq(evaluationsTable.status, "completed"),
-      ))
-      .where(eq(sessionsTable.userId, user.id))
-      .orderBy(desc(sessionsTable.createdAt))
+      .innerJoin(latest, eq(latest.sessionId, sessionsTable.id))
+      .where(and(eq(sessionsTable.userId, user.id), isNotNull(latestScore)))
+      .orderBy(desc(sessionsTable.createdAt), desc(sessionsTable.id))
       .limit(30);
 
     // 3. Recent sessions (last 10) with full details
@@ -61,17 +54,14 @@ export const statsRoutes = new Hono()
         category: questionsTable.category,
         type: questionsTable.type,
         status: sessionsTable.status,
-        score: evaluationsTable.score,
+        score: latestScore,
         createdAt: sessionsTable.createdAt,
       })
       .from(sessionsTable)
       .innerJoin(questionsTable, eq(sessionsTable.questionId, questionsTable.id))
-      .leftJoin(answersTable, eq(answersTable.sessionId, sessionsTable.id))
-      .leftJoin(evaluationsTable, and(
-        eq(evaluationsTable.answerId, answersTable.id),
-      ))
+      .leftJoin(latest, eq(latest.sessionId, sessionsTable.id))
       .where(eq(sessionsTable.userId, user.id))
-      .orderBy(desc(sessionsTable.createdAt))
+      .orderBy(desc(sessionsTable.createdAt), desc(sessionsTable.id))
       .limit(10);
 
     // 4. Streak calculation: count consecutive days with at least 1 session
@@ -105,22 +95,18 @@ export const statsRoutes = new Hono()
     // 5. Overall totals
     const [totals] = await db
       .select({
-        totalSessions: sql<number>`COUNT(DISTINCT ${sessionsTable.id})`.as("total_sessions"),
-        completedSessions: sql<number>`COUNT(DISTINCT CASE WHEN ${sessionsTable.status} = 'answer_submitted' THEN ${sessionsTable.id} END)`.as("completed_sessions"),
-        avgScore: sql<number>`ROUND(AVG(${evaluationsTable.score}))`.as("avg_score"),
+        totalSessions: sql<number>`COUNT(${sessionsTable.id})`.mapWith(Number).as("total_sessions"),
+        completedSessions: sql<number>`COUNT(CASE WHEN ${sessionsTable.status} = 'answer_submitted' THEN ${sessionsTable.id} END)`.mapWith(Number).as("completed_sessions"),
+        avgScore: sql<number | null>`ROUND(AVG(${latestScore}))`.mapWith(Number).as("avg_score"),
       })
       .from(sessionsTable)
-      .leftJoin(answersTable, eq(answersTable.sessionId, sessionsTable.id))
-      .leftJoin(evaluationsTable, and(
-        eq(evaluationsTable.answerId, answersTable.id),
-        eq(evaluationsTable.status, "completed"),
-      ))
+      .leftJoin(latest, eq(latest.sessionId, sessionsTable.id))
       .where(eq(sessionsTable.userId, user.id));
 
     // 6. Total question count (for "X/52 solved" display)
     const [questionCounts] = await db
       .select({
-        total: sql<number>`COUNT(*)`.as("total"),
+        total: sql<number>`COUNT(*)`.mapWith(Number).as("total"),
       })
       .from(questionsTable);
 
@@ -128,14 +114,10 @@ export const statsRoutes = new Hono()
     const solvedQuestions = await db
       .select({
         questionId: sessionsTable.questionId,
-        bestScore: sql<number>`MAX(${evaluationsTable.score})`.as("best_score"),
+        bestScore: sql<number | null>`MAX(${bestScore})`.mapWith(Number).as("best_score"),
       })
       .from(sessionsTable)
-      .innerJoin(answersTable, eq(answersTable.sessionId, sessionsTable.id))
-      .innerJoin(evaluationsTable, and(
-        eq(evaluationsTable.answerId, answersTable.id),
-        eq(evaluationsTable.status, "completed"),
-      ))
+      .innerJoin(best, eq(best.sessionId, sessionsTable.id))
       .where(eq(sessionsTable.userId, user.id))
       .groupBy(sessionsTable.questionId);
 
@@ -144,17 +126,13 @@ export const statsRoutes = new Hono()
     // 8. LGTM count (sessions with score = 100)
     const [lgtmResult] = await db
       .select({
-        count: sql<number>`COUNT(DISTINCT ${sessionsTable.id})`.as("lgtm_count"),
+        count: sql<number>`COUNT(${sessionsTable.id})`.mapWith(Number).as("lgtm_count"),
       })
       .from(sessionsTable)
-      .innerJoin(answersTable, eq(answersTable.sessionId, sessionsTable.id))
-      .innerJoin(evaluationsTable, and(
-        eq(evaluationsTable.answerId, answersTable.id),
-        eq(evaluationsTable.status, "completed"),
-      ))
+      .innerJoin(latest, eq(latest.sessionId, sessionsTable.id))
       .where(and(
         eq(sessionsTable.userId, user.id),
-        sql`${evaluationsTable.score} = 100`,
+        sql`${latestScore} = 100`,
       ));
 
     // 9. Weakest category (lowest avg score with at least 1 session)
@@ -208,22 +186,20 @@ export const statsRoutes = new Hono()
     const user = c.get("user") as AuthUser;
     const db = getPgDb();
     const category = c.req.param("category");
+    const { latest, best, latestScore, bestScore } = sessionEvaluationQueries(db, user.id);
 
     // 1. Category overview: avg, best, session count, solved count
     const [overview] = await db
       .select({
-        sessionCount: sql<number>`COUNT(DISTINCT ${sessionsTable.id})`.as("session_count"),
-        completedCount: sql<number>`COUNT(DISTINCT CASE WHEN ${sessionsTable.status} = 'answer_submitted' THEN ${sessionsTable.id} END)`.as("completed_count"),
-        avgScore: sql<number>`ROUND(AVG(${evaluationsTable.score}))`.as("avg_score"),
-        bestScore: sql<number>`MAX(${evaluationsTable.score})`.as("best_score"),
+        sessionCount: sql<number>`COUNT(${sessionsTable.id})`.mapWith(Number).as("session_count"),
+        completedCount: sql<number>`COUNT(CASE WHEN ${sessionsTable.status} = 'answer_submitted' THEN ${sessionsTable.id} END)`.mapWith(Number).as("completed_count"),
+        avgScore: sql<number | null>`ROUND(AVG(${latestScore}))`.mapWith(Number).as("avg_score"),
+        bestScore: sql<number | null>`MAX(${bestScore})`.mapWith(Number).as("best_score"),
       })
       .from(sessionsTable)
       .innerJoin(questionsTable, eq(sessionsTable.questionId, questionsTable.id))
-      .leftJoin(answersTable, eq(answersTable.sessionId, sessionsTable.id))
-      .leftJoin(evaluationsTable, and(
-        eq(evaluationsTable.answerId, answersTable.id),
-        eq(evaluationsTable.status, "completed"),
-      ))
+      .leftJoin(latest, eq(latest.sessionId, sessionsTable.id))
+      .leftJoin(best, eq(best.sessionId, sessionsTable.id))
       .where(and(
         eq(sessionsTable.userId, user.id),
         eq(questionsTable.category, category),
@@ -231,7 +207,7 @@ export const statsRoutes = new Hono()
 
     // Total questions in this category
     const [qCount] = await db
-      .select({ total: sql<number>`COUNT(*)`.as("total") })
+      .select({ total: sql<number>`COUNT(*)`.mapWith(Number).as("total") })
       .from(questionsTable)
       .where(eq(questionsTable.category, category));
 
@@ -239,15 +215,11 @@ export const statsRoutes = new Hono()
     const solvedInCat = await db
       .select({
         questionId: sessionsTable.questionId,
-        bestScore: sql<number>`MAX(${evaluationsTable.score})`.as("best_score"),
+        bestScore: sql<number | null>`MAX(${bestScore})`.mapWith(Number).as("best_score"),
       })
       .from(sessionsTable)
       .innerJoin(questionsTable, eq(sessionsTable.questionId, questionsTable.id))
-      .innerJoin(answersTable, eq(answersTable.sessionId, sessionsTable.id))
-      .innerJoin(evaluationsTable, and(
-        eq(evaluationsTable.answerId, answersTable.id),
-        eq(evaluationsTable.status, "completed"),
-      ))
+      .innerJoin(best, eq(best.sessionId, sessionsTable.id))
       .where(and(
         eq(sessionsTable.userId, user.id),
         eq(questionsTable.category, category),
@@ -260,39 +232,33 @@ export const statsRoutes = new Hono()
     const scoreTrend = await db
       .select({
         sessionId: sessionsTable.id,
-        score: evaluationsTable.score,
+        score: latestScore,
         createdAt: sessionsTable.createdAt,
         type: questionsTable.type,
       })
       .from(sessionsTable)
       .innerJoin(questionsTable, eq(sessionsTable.questionId, questionsTable.id))
-      .innerJoin(answersTable, eq(answersTable.sessionId, sessionsTable.id))
-      .innerJoin(evaluationsTable, and(
-        eq(evaluationsTable.answerId, answersTable.id),
-        eq(evaluationsTable.status, "completed"),
-      ))
+      .innerJoin(latest, eq(latest.sessionId, sessionsTable.id))
       .where(and(
         eq(sessionsTable.userId, user.id),
         eq(questionsTable.category, category),
+        isNotNull(latestScore),
       ))
-      .orderBy(desc(sessionsTable.createdAt))
+      .orderBy(desc(sessionsTable.createdAt), desc(sessionsTable.id))
       .limit(30);
 
     // 3. Sub-topic breakdown
     const subtopicStats = await db
       .select({
         type: questionsTable.type,
-        sessionCount: sql<number>`COUNT(DISTINCT ${sessionsTable.id})`.as("session_count"),
-        avgScore: sql<number>`ROUND(AVG(${evaluationsTable.score}))`.as("avg_score"),
-        bestScore: sql<number>`MAX(${evaluationsTable.score})`.as("best_score"),
+        sessionCount: sql<number>`COUNT(${sessionsTable.id})`.mapWith(Number).as("session_count"),
+        avgScore: sql<number | null>`ROUND(AVG(${latestScore}))`.mapWith(Number).as("avg_score"),
+        bestScore: sql<number | null>`MAX(${bestScore})`.mapWith(Number).as("best_score"),
       })
       .from(sessionsTable)
       .innerJoin(questionsTable, eq(sessionsTable.questionId, questionsTable.id))
-      .leftJoin(answersTable, eq(answersTable.sessionId, sessionsTable.id))
-      .leftJoin(evaluationsTable, and(
-        eq(evaluationsTable.answerId, answersTable.id),
-        eq(evaluationsTable.status, "completed"),
-      ))
+      .leftJoin(latest, eq(latest.sessionId, sessionsTable.id))
+      .leftJoin(best, eq(best.sessionId, sessionsTable.id))
       .where(and(
         eq(sessionsTable.userId, user.id),
         eq(questionsTable.category, category),
@@ -303,41 +269,43 @@ export const statsRoutes = new Hono()
     const typeQuestionCounts = await db
       .select({
         type: questionsTable.type,
-        total: sql<number>`COUNT(*)`.as("total"),
+        total: sql<number>`COUNT(*)`.mapWith(Number).as("total"),
       })
       .from(questionsTable)
       .where(eq(questionsTable.category, category))
       .groupBy(questionsTable.type);
 
-    const typeCountMap: Record<string, number> = {};
-    for (const t of typeQuestionCounts) typeCountMap[t.type] = t.total;
+    const typeCountMap = new Map(typeQuestionCounts.map((t) => [t.type, t.total]));
 
-    // 4. Criteria insights — aggregate criteriaResults across all evaluations in this category
+    // 4. Criteria insights from each session's latest valid evaluation only.
     const criteriaRows = await db
       .select({
-        criteriaResults: evaluationsTable.criteriaResults,
+        criteriaResults: latest.criteriaResults,
       })
-      .from(evaluationsTable)
-      .innerJoin(answersTable, eq(evaluationsTable.answerId, answersTable.id))
-      .innerJoin(sessionsTable, eq(answersTable.sessionId, sessionsTable.id))
+      .from(sessionsTable)
+      .innerJoin(latest, eq(latest.sessionId, sessionsTable.id))
       .innerJoin(questionsTable, eq(sessionsTable.questionId, questionsTable.id))
       .where(and(
         eq(sessionsTable.userId, user.id),
         eq(questionsTable.category, category),
-        eq(evaluationsTable.status, "completed"),
+        isNotNull(latestScore),
       ));
 
     // Aggregate criteria: count how often each criterion label was covered vs missed
     const criteriaMap = new Map<string, { covered: number; total: number }>();
     for (const row of criteriaRows) {
-      const results = row.criteriaResults as Array<{ label: string; met: boolean }>;
+      const results: unknown = row.criteriaResults;
       if (!Array.isArray(results)) continue;
+      const seen = new Set<string>();
       for (const cr of results) {
-        const label = cr.label;
-        if (!label) continue;
+        if (cr === null || typeof cr !== "object" || typeof cr.criterion !== "string" ||
+            !["covered", "partial", "missing"].includes(cr.coverage)) continue;
+        const label = cr.criterion.trim();
+        if (!label || seen.has(label)) continue;
+        seen.add(label);
         const existing = criteriaMap.get(label) ?? { covered: 0, total: 0 };
         existing.total++;
-        if (cr.met) existing.covered++;
+        if (cr.coverage === "covered") existing.covered++;
         criteriaMap.set(label, existing);
       }
     }
@@ -349,29 +317,24 @@ export const statsRoutes = new Hono()
     const mostCovered = criteriaInsights.filter((c) => c.rate >= 0.6).sort((a, b) => b.rate - a.rate).slice(0, 5);
     const mostMissed = criteriaInsights.filter((c) => c.rate < 0.6).sort((a, b) => a.rate - b.rate).slice(0, 5);
 
-    // 5. All sessions in this category (deduplicated — pick best score per session)
+    // 5. All sessions in this category, with the same latest-attempt score as history.
     const allSessionsRaw = await db
       .select({
         sessionId: sessionsTable.id,
         questionTitle: questionsTable.title,
         type: questionsTable.type,
         status: sessionsTable.status,
-        score: sql<number>`MAX(${evaluationsTable.score})`.as("score"),
+        score: latestScore,
         createdAt: sessionsTable.createdAt,
       })
       .from(sessionsTable)
       .innerJoin(questionsTable, eq(sessionsTable.questionId, questionsTable.id))
-      .leftJoin(answersTable, eq(answersTable.sessionId, sessionsTable.id))
-      .leftJoin(evaluationsTable, and(
-        eq(evaluationsTable.answerId, answersTable.id),
-        eq(evaluationsTable.status, "completed"),
-      ))
+      .leftJoin(latest, eq(latest.sessionId, sessionsTable.id))
       .where(and(
         eq(sessionsTable.userId, user.id),
         eq(questionsTable.category, category),
       ))
-      .groupBy(sessionsTable.id, questionsTable.title, questionsTable.type, sessionsTable.status, sessionsTable.createdAt)
-      .orderBy(desc(sessionsTable.createdAt));
+      .orderBy(desc(sessionsTable.createdAt), desc(sessionsTable.id));
 
     return c.json({
       ok: true,
@@ -394,7 +357,7 @@ export const statsRoutes = new Hono()
         sessionCount: r.sessionCount,
         avgScore: r.avgScore,
         bestScore: r.bestScore,
-        totalQuestions: typeCountMap[r.type] ?? 0,
+        totalQuestions: typeCountMap.get(r.type) ?? 0,
       })),
       criteriaInsights: {
         mostCovered,

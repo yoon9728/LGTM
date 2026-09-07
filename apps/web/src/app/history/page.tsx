@@ -8,7 +8,7 @@ import { Separator } from "@/components/ui/separator";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { UserButton } from "@/components/user-button";
 import { useSession } from "@/lib/auth-client";
-import { api } from "@/lib/api";
+import { api, getApiErrorMessage } from "@/lib/api";
 import type { HistoryEntry } from "@/lib/api";
 import { LoadingSpinner } from "@/components/loading-spinner";
 import { MobileNav } from "@/components/mobile-nav";
@@ -54,6 +54,8 @@ export default function HistoryPage() {
   const [history, setHistory] = useState<HistoryEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<string>("all");
+  const [error, setError] = useState<string | null>(null);
+  const [retry, setRetry] = useState(0);
 
   useEffect(() => {
     if (isPending) return;
@@ -61,12 +63,14 @@ export default function HistoryPage() {
       router.push("/sign-in");
       return;
     }
+    let cancelled = false;
     api
       .getHistory()
-      .then((res) => setHistory(res.history))
-      .catch(() => {})
-      .finally(() => setLoading(false));
-  }, [authSession, isPending, router]);
+      .then((res) => { if (!cancelled) setHistory(res.history); })
+      .catch((err) => { if (!cancelled) setError(getApiErrorMessage(err, "Could not load your history. Please try again.")); })
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
+  }, [authSession, isPending, router, retry]);
 
   if (isPending || (!authSession?.user && !loading)) {
     return (
@@ -77,11 +81,12 @@ export default function HistoryPage() {
   }
 
   const completedSessions = history.filter((h) => h.status === "answer_submitted");
+  const scoredSessions = completedSessions.filter((h) => h.score != null);
   const avgScore =
-    completedSessions.length > 0
+    scoredSessions.length > 0
       ? Math.round(
-          completedSessions.reduce((sum, h) => sum + (h.score ?? 0), 0) /
-            completedSessions.length
+          scoredSessions.reduce((sum, h) => sum + h.score!, 0) /
+            scoredSessions.length
         )
       : null;
 
@@ -171,7 +176,12 @@ export default function HistoryPage() {
       )}
 
       {/* History List */}
-      {loading ? (
+      {error ? (
+        <div role="alert" className="rounded-lg border border-destructive/20 bg-destructive/10 p-4 space-y-3">
+          <p className="text-sm text-destructive">{error}</p>
+          <Button variant="outline" onClick={() => { setError(null); setLoading(true); setRetry((value) => value + 1); }}>Retry</Button>
+        </div>
+      ) : loading ? (
         <div className="flex justify-center py-12">
           <LoadingSpinner size="md" />
         </div>
@@ -201,8 +211,9 @@ export default function HistoryPage() {
           {filteredHistory.map((entry) => {
             const catMeta = CATEGORY_META[entry.questionCategory] ?? CATEGORY_META.code_review;
             return (
-              <div
+              <Link
                 key={entry.sessionId}
+                href={`/practice/session/${entry.sessionId}`}
                 className="flex items-center justify-between rounded-lg border border-border px-4 py-3 hover:bg-accent/50 transition-colors"
               >
                 <div className="flex items-center gap-3 min-w-0">
@@ -231,7 +242,7 @@ export default function HistoryPage() {
                     {new Date(entry.createdAt).toLocaleDateString()}
                   </span>
                 </div>
-              </div>
+              </Link>
             );
           })}
         </div>

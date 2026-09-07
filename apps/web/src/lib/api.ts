@@ -1,3 +1,5 @@
+import { recordGuestSession } from "./guest";
+
 // Route API calls through the Next.js proxy so session cookies (first-party) are sent.
 // On the server (SSR/build) we still need the direct URL for non-browser contexts.
 const API_BASE =
@@ -13,6 +15,23 @@ export class ApiError extends Error {
     this.name = "ApiError";
     this.status = status;
   }
+}
+
+export function getApiErrorMessage(error: unknown, fallback: string): string {
+  if (!(error instanceof ApiError)) return fallback;
+  if (error.status === 429) {
+    if (error.message.includes("Guest session limit")) {
+      return "Guest session limit reached. Sign in or create an account to continue, or try again after your daily limit resets.";
+    }
+    if (error.message.includes("Retry limit")) {
+      return "The retry limit for this session has been reached. Your answer is saved.";
+    }
+    return "Too many requests. Please wait a moment and try again.";
+  }
+  if (error.status === 401 || error.status === 403) {
+    return "Please sign in with the account that owns this session or question.";
+  }
+  return fallback;
 }
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
@@ -86,6 +105,34 @@ export interface Session {
   language: string | null;
   status: string;
   question: Question;
+}
+
+export interface AnswerReview {
+  summary?: string;
+  findings?: string[];
+  overview?: string;
+  components?: string;
+  tradeoffs?: string;
+  scalingStrategy?: string;
+  rootCause?: string;
+  evidence?: string;
+  proposedFix?: string;
+  query?: string;
+  explanation?: string;
+  optimization?: string;
+  code?: string;
+  approach?: string;
+  complexity?: string;
+  analysis?: string;
+  recommendation?: string;
+  reasoning?: string;
+  selectedAnswer?: string;
+  blocks?: { type: "text" | "code"; language?: string; content: string }[];
+}
+
+export interface Answer {
+  id: string;
+  review: AnswerReview;
 }
 
 export interface CriterionResult {
@@ -207,8 +254,7 @@ export interface CategoryDetail {
 
 /** Fire-and-forget ping to wake the API from cold start */
 export function warmUpApi() {
-  const directApi = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4300";
-  fetch(`${directApi}/health`, { method: "GET" }).catch(() => {});
+  fetch("/api/v1/health", { method: "GET" }).catch(() => {});
 }
 
 export const api = {
@@ -229,14 +275,20 @@ export const api = {
       "/practice/questions/meta"
     ),
 
-  createSession: (opts?: { questionId?: string; category?: string; type?: string; language?: string }) =>
-    request<{ session: Session; isGuest: boolean }>("/practice/sessions", {
+  createSession: async (opts?: { questionId?: string; category?: string; type?: string; language?: string }) => {
+    const result = await request<{ session: Session; isGuest: boolean }>("/practice/sessions", {
       method: "POST",
       body: JSON.stringify(opts ?? {}),
-    }),
+    });
+    if (result.isGuest) recordGuestSession();
+    return result;
+  },
 
   getSession: (id: string) =>
     request<{ session: Session }>(`/practice/sessions/${id}`),
+
+  getSessionResult: (id: string) =>
+    request<{ answer: Answer | null; evaluation: Evaluation | null }>(`/practice/sessions/${id}/result`),
 
   updateSession: (id: string, body: { language?: string }) =>
     request<{ session: Session }>(`/practice/sessions/${id}`, {
@@ -250,13 +302,13 @@ export const api = {
     category: string;
     [key: string]: unknown;
   }) =>
-    request<{ answer: { id: string }; evaluation: Evaluation }>(
+    request<{ answer: Answer; evaluation: Evaluation }>(
       "/practice/answers",
       { method: "POST", body: JSON.stringify(body) }
     ),
 
   retryEvaluation: (sessionId: string) =>
-    request<{ answer: { id: string }; evaluation: Evaluation }>(`/practice/sessions/${sessionId}/retry-evaluation`, { method: "POST" }),
+    request<{ answer: Answer; evaluation: Evaluation }>(`/practice/sessions/${sessionId}/retry-evaluation`, { method: "POST" }),
 
   getHistory: () =>
     request<{ history: HistoryEntry[] }>("/practice/history"),

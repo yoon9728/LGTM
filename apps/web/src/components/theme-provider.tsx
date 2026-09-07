@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useEffect, useState } from "react";
+import { createContext, useContext, useSyncExternalStore } from "react";
 
 type Theme = "light" | "dark";
 
@@ -13,31 +13,55 @@ export function useTheme() {
   return useContext(ThemeContext);
 }
 
+function preferredTheme(): Theme {
+  try {
+    const stored = window.localStorage.getItem("theme");
+    if (stored === "light" || stored === "dark") return stored;
+  } catch {
+    // Private browsing can disable storage; system preference still works.
+  }
+  return window.matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark";
+}
+
+function applyTheme(theme: Theme) {
+  document.documentElement.classList.toggle("light", theme === "light");
+  document.documentElement.classList.toggle("dark", theme === "dark");
+}
+
+function getTheme(): Theme {
+  return document.documentElement.classList.contains("light") ? "light" : "dark";
+}
+
+function subscribe(onChange: () => void) {
+  const syncPreference = () => applyTheme(preferredTheme());
+  const observer = new MutationObserver(onChange);
+  observer.observe(document.documentElement, { attributes: true, attributeFilter: ["class"] });
+  const media = window.matchMedia("(prefers-color-scheme: light)");
+  media.addEventListener("change", syncPreference);
+  window.addEventListener("storage", syncPreference);
+  syncPreference();
+  return () => {
+    observer.disconnect();
+    media.removeEventListener("change", syncPreference);
+    window.removeEventListener("storage", syncPreference);
+  };
+}
+
+function toggleTheme() {
+  const theme = getTheme() === "dark" ? "light" : "dark";
+  applyTheme(theme);
+  try {
+    window.localStorage.setItem("theme", theme);
+  } catch {
+    // A storage failure must not stop the theme toggle.
+  }
+}
+
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
-  const [theme, setTheme] = useState<Theme>("dark");
-  const [mounted, setMounted] = useState(false);
-
-  useEffect(() => {
-    const stored = localStorage.getItem("theme") as Theme | null;
-    const preferred = window.matchMedia("(prefers-color-scheme: light)").matches
-      ? "light"
-      : "dark";
-    setTheme(stored ?? preferred);
-    setMounted(true);
-  }, []);
-
-  useEffect(() => {
-    if (!mounted) return;
-    const root = document.documentElement;
-    root.classList.remove("light", "dark");
-    root.classList.add(theme);
-    localStorage.setItem("theme", theme);
-  }, [theme, mounted]);
-
-  const toggle = () => setTheme((t) => (t === "dark" ? "light" : "dark"));
+  const theme = useSyncExternalStore(subscribe, getTheme, () => "dark" as const);
 
   return (
-    <ThemeContext.Provider value={{ theme, toggle }}>
+    <ThemeContext.Provider value={{ theme, toggle: toggleTheme }}>
       {children}
     </ThemeContext.Provider>
   );

@@ -1,21 +1,22 @@
 import { Hono } from "hono";
-import { eq } from "drizzle-orm";
+import { desc, eq } from "drizzle-orm";
 import { getPgDb } from "../db/index.js";
 import {
   sessions as sessionsTable,
-  answers as answersTable,
-  evaluations as evaluationsTable,
   questions as questionsTable,
 } from "../db/schema.js";
 import { requireAuth, type AuthUser } from "../middleware/auth.js";
+import { sessionEvaluationQueries } from "./session-evaluation.js";
 
 export const historyRoutes = new Hono()
   .use("*", requireAuth)
 
   .get("/", async (c) => {
     const user = c.get("user") as AuthUser;
+    const db = getPgDb();
+    const { latest, latestScore } = sessionEvaluationQueries(db, user.id);
 
-    const rows = await getPgDb()
+    const rows = await db
       .select({
         sessionId: sessionsTable.id,
         status: sessionsTable.status,
@@ -24,13 +25,13 @@ export const historyRoutes = new Hono()
         questionCategory: questionsTable.category,
         questionType: questionsTable.type,
         questionLanguage: questionsTable.language,
-        score: evaluationsTable.score,
+        score: latestScore,
       })
       .from(sessionsTable)
       .innerJoin(questionsTable, eq(sessionsTable.questionId, questionsTable.id))
-      .leftJoin(answersTable, eq(answersTable.sessionId, sessionsTable.id))
-      .leftJoin(evaluationsTable, eq(evaluationsTable.answerId, answersTable.id))
-      .where(eq(sessionsTable.userId, user.id));
+      .leftJoin(latest, eq(latest.sessionId, sessionsTable.id))
+      .where(eq(sessionsTable.userId, user.id))
+      .orderBy(desc(sessionsTable.createdAt), desc(sessionsTable.id));
 
     const history = rows.map((r) => ({
       sessionId: r.sessionId,
